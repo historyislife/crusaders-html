@@ -962,9 +962,9 @@
             </div>
             <div id="map-score-window" class="map-hud-window">
                 <span class="map-status-vp">残り勝利点 <span id="map-vp">140</span></span>
-                <span class="map-status-enemy">サラセン人 <span id="map-strength-saracen">6</span></span>
-                <span class="map-status-enemy">プロイセン人 <span id="map-strength-prussian">3</span></span>
-                <span class="map-status-enemy">スラブ人 <span id="map-strength-slav">3</span></span>
+                <span class="map-status-enemy">サラセン人🏹 <span id="map-strength-saracen">6</span></span>
+                <span class="map-status-enemy">プロイセン人🛡 <span id="map-strength-prussian">3</span></span>
+                <span class="map-status-enemy">スラブ人⚔ <span id="map-strength-slav">3</span></span>
             </div>
         </div>
         <div id="map-section">
@@ -1421,6 +1421,15 @@
             return playerController === "bot-normal" ? "ボット" : "プレイヤー";
         }
 
+        function getMapBuildingSymbol(buildingName) {
+            return {
+                "城": "🏰",
+                "教会": "⛪",
+                "農場": "🌾",
+                "銀行": "💰"
+            }[buildingName] || buildingName;
+        }
+
         function updateMapBuildingLabelColor(hexKey) {
             const info = hexInfos[hexKey];
             const group = hexGroups[hexKey];
@@ -1511,7 +1520,7 @@
                     const text = document.createElementNS(SVG_NS, "text");
                     text.setAttribute("x", cx);
                     text.setAttribute("y", cy + 4);
-                    text.setAttribute("font-size", "12px");
+                    text.setAttribute("font-size", "17px");
                     text.setAttribute("font-weight", "bold");
                     text.setAttribute("text-anchor", "middle");
                     text.style.pointerEvents = "none";
@@ -1519,17 +1528,17 @@
                     if (enemyType === "サラセン人") {
                         circle.setAttribute("fill", "#eab308");
                         text.setAttribute("fill", "#000");
-                        text.textContent = "サ";
+                        text.textContent = "🏹";
                         const bonus = saracenBonuses[saracenIndex++];
                         hexInfo.memo = `【撃破ボーナス】\n${bonus}`;
                     } else if (enemyType === "プロイセン人") {
                         circle.setAttribute("fill", "#3b82f6");
                         text.setAttribute("fill", "#fff");
-                        text.textContent = "プ";
+                        text.textContent = "🛡";
                     } else if (enemyType === "スラブ人") {
                         circle.setAttribute("fill", "#ef4444");
                         text.setAttribute("fill", "#fff");
-                        text.textContent = "ス";
+                        text.textContent = "⚔";
                     }
                     
                     circle.style.pointerEvents = "none";
@@ -1575,10 +1584,7 @@
                         playerResources.defeated[enemyType]++;
                         globalDefeated[enemyType]++;
 
-                        const enemyCircle = group.querySelector("circle");
-                        if (enemyCircle) enemyCircle.remove();
-                        const enemyText = Array.from(group.querySelectorAll("text")).find(el => ["サ", "プ", "ス"].includes(el.textContent));
-                        if (enemyText) enemyText.remove();
+                        group.querySelectorAll(".enemy-token, .enemy-label").forEach(el => el.remove());
 
                         targetInfo.faction = "なし";
                         targetInfo.affiliation = "なし";
@@ -1825,11 +1831,11 @@
             const text = document.createElementNS(SVG_NS, "text");
             text.setAttribute("x", cx);
             text.setAttribute("y", cy + 4);
-            text.setAttribute("font-size", "10px");
+            text.setAttribute("font-size", "20px");
             text.setAttribute("font-weight", "bold");
             text.setAttribute("fill", "#ffffff");
             text.setAttribute("text-anchor", "middle");
-            text.textContent = number === 4 ? "黒騎" : `騎${number}`;
+            text.textContent = playerController === "bot-normal" ? "♞" : "♘";
             text.style.pointerEvents = "none";
 
             group.appendChild(hitArea);
@@ -1886,11 +1892,11 @@
             const pText = document.createElementNS(SVG_NS, "text");
             pText.setAttribute("x", cx);
             pText.setAttribute("y", cy + 4);
-            pText.setAttribute("font-size", "11px");
+            pText.setAttribute("font-size", "20px");
             pText.setAttribute("font-weight", "bold");
             pText.setAttribute("fill", "#ffffff");
             pText.setAttribute("text-anchor", "middle");
-            pText.textContent = "騎";
+            pText.textContent = playerController === "bot-normal" ? "♞" : "♘";
             pText.style.pointerEvents = "none";
 
             pGroup.appendChild(pHitArea);
@@ -1969,10 +1975,7 @@
                 playerResources.defeated[enemyType]++;
                 globalDefeated[enemyType]++;
                 const group = hexGroups[key];
-                const enemyCircle = group ? group.querySelector("circle") : null;
-                if (enemyCircle) enemyCircle.remove();
-                const enemyText = group ? Array.from(group.querySelectorAll("text")).find(el => ["サ", "プ", "ス"].includes(el.textContent)) : null;
-                if (enemyText) enemyText.remove();
+                if (group) group.querySelectorAll(".enemy-token, .enemy-label").forEach(el => el.remove());
                 info.faction = "なし";
                 info.affiliation = "なし";
                 updateHexAffiliationVisual(key);
@@ -2435,7 +2438,7 @@
                     const text = document.createElementNS(SVG_NS, "text");
                     text.setAttribute("x", cx);
                     text.setAttribute("y", cy + 4);
-                    text.setAttribute("font-size", "12px");
+                    text.setAttribute("font-size", "17px");
                     text.setAttribute("font-weight", "bold");
                     text.setAttribute("text-anchor", "middle");
                     text.style.pointerEvents = "none";
@@ -2444,17 +2447,17 @@
                     if (enemyType === "サラセン人") {
                         circle.setAttribute("fill", "#eab308");
                         text.setAttribute("fill", "#000");
-                        text.textContent = "サ";
+                        text.textContent = "🏹";
                         const bonus = saracenBonuses[resetSaracenIndex++];
                         info.memo = `【撃破ボーナス】\n${bonus}`;
                     } else if (enemyType === "プロイセン人") {
                         circle.setAttribute("fill", "#3b82f6");
                         text.setAttribute("fill", "#fff");
-                        text.textContent = "プ";
+                        text.textContent = "🛡";
                     } else {
                         circle.setAttribute("fill", "#ef4444");
                         text.setAttribute("fill", "#fff");
-                        text.textContent = "ス";
+                        text.textContent = "⚔";
                     }
                     group.appendChild(circle);
                     group.appendChild(text);
@@ -2703,6 +2706,17 @@
                 c.setAttribute("stroke", other.controller === "bot-normal" ? "#94a3b8" : "#ffffff");
                 c.setAttribute("stroke-width","2"); c.setAttribute("opacity","0.82");
                 inactiveKnightLayer.appendChild(c);
+
+                const knightGlyph=document.createElementNS(SVG_NS,"text");
+                knightGlyph.setAttribute("x",cx);
+                knightGlyph.setAttribute("y",cy+5);
+                knightGlyph.setAttribute("font-size","15px");
+                knightGlyph.setAttribute("font-weight","bold");
+                knightGlyph.setAttribute("fill","#ffffff");
+                knightGlyph.setAttribute("text-anchor","middle");
+                knightGlyph.setAttribute("opacity","0.9");
+                knightGlyph.textContent=other.controller === "bot-normal" ? "♞" : "♘";
+                inactiveKnightLayer.appendChild(knightGlyph);
             });
             mapGroup.appendChild(inactiveKnightLayer);
         }
@@ -4023,7 +4037,7 @@
         statusPanel.innerHTML = `
             <div class="status-item" style="grid-column:1 / -1;"><span class="status-label">騎士団</span><span class="status-value" id="status-knight-order">未選択</span></div>
             <div class="status-item"><span class="status-label">勝利点</span><span class="status-value" id="status-vp">0</span></div>
-            <div class="status-item" id="defeat-status"><span class="status-label">撃破数</span><span class="status-value" id="status-defeated">サラセン人 0 / プロイセン人 0 / スラブ人 0</span></div>
+            <div class="status-item" id="defeat-status"><span class="status-label">撃破数</span><span class="status-value" id="status-defeated">サラセン人🏹 0 / プロイセン人🛡 0 / スラブ人⚔ 0</span></div>
             <div class="status-action-row">
                 <span>移動 <strong id="status-move">0</strong></span>
                 <span>建設 <strong id="status-build">0</strong></span>
@@ -4042,7 +4056,7 @@
             }
             document.getElementById("status-vp").textContent = playerResources.victoryPoints;
             document.getElementById("status-defeated").textContent =
-                `サラセン人 ${playerResources.defeated["サラセン人"]} / プロイセン人 ${playerResources.defeated["プロイセン人"]} / スラブ人 ${playerResources.defeated["スラブ人"]}`;
+                `サラセン人🏹 ${playerResources.defeated["サラセン人"]} / プロイセン人🛡 ${playerResources.defeated["プロイセン人"]} / スラブ人⚔ ${playerResources.defeated["スラブ人"]}`;
             document.getElementById("status-move").textContent = playerResources.bonuses.move;
             document.getElementById("status-build").textContent = playerResources.bonuses.build;
             document.getElementById("status-recruit").textContent = playerResources.bonuses.recruit;
@@ -4375,14 +4389,14 @@
                 if (pos[0] % 2 !== 0) cy += Y_OFFSET / 2;
                 const bText = document.createElementNS(SVG_NS, "text");
                 bText.setAttribute("x", cx);
-                bText.setAttribute("y", cy - 12);
-                bText.setAttribute("font-size", "10px");
+                bText.setAttribute("y", cy + 12);
+                bText.setAttribute("font-size", "36px");
                 bText.setAttribute("font-weight", "bold");
                 bText.setAttribute("fill", hexInfo.affiliation === "ボット" ? "#ffffff" : "#000000");
                 bText.setAttribute("text-anchor", "middle");
                 bText.style.pointerEvents = "none";
                 bText.classList.add("building-label");
-                bText.textContent = buildingName;
+                bText.textContent = getMapBuildingSymbol(buildingName);
                 group.appendChild(bText);
                 updateMapBuildingLabelColor(hexKey);
             }
@@ -4645,14 +4659,14 @@
 
                     const bText = document.createElementNS(SVG_NS, "text");
                     bText.setAttribute("x", cx);
-                    bText.setAttribute("y", cy - 12);
-                    bText.setAttribute("font-size", "10px");
+                    bText.setAttribute("y", cy + 12);
+                    bText.setAttribute("font-size", "36px");
                     bText.setAttribute("font-weight", "bold");
                     bText.setAttribute("fill", hexInfo.affiliation === "ボット" ? "#ffffff" : "#000000");
                     bText.setAttribute("text-anchor", "middle");
                     bText.style.pointerEvents = "none";
                     bText.classList.add("map-building-label");
-                    bText.textContent = `[${building.name}]`;
+                    bText.textContent = getMapBuildingSymbol(building.name);
                     hexGroups[currentKey].appendChild(bText);
                     updateMapBuildingLabelColor(currentKey);
 
