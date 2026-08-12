@@ -305,7 +305,8 @@
         /* ドラッグ可能なフローティング・アクションホイール */
         #wheel-container {
             position: fixed;
-            left: calc(100vw - 270px);
+            left: calc(100vw - 242px);
+            right: auto;
             top: 52%;
             transform: translateY(-50%);
             z-index: 200;
@@ -795,22 +796,22 @@
             }
 
             #wheel-container {
-                width: auto;
+                width: min(238px, 40vw, 42vh);
                 min-width: 0;
-                left: auto;
-                right: 6px;
+                left: calc(100vw - min(238px, 40vw, 42vh) - 8px);
+                right: auto;
                 top: 50%;
                 padding: 0 3px 5px 3px;
             }
 
             #wheel-svg {
-                width: min(250px, 39vw, 38vh);
-                height: min(250px, 39vw, 38vh);
-                max-width: 250px;
+                width: min(228px, 38vw, 38vh);
+                height: min(228px, 38vw, 38vh);
+                max-width: 228px;
             }
 
             #wheel-svg-wrapper {
-                width: auto;
+                width: 100%;
             }
 
             #wheel-drag-handle {
@@ -889,16 +890,17 @@
             }
 
             #wheel-container {
-                width: auto;
+                width: min(200px, 37vw, 40vh);
                 min-width: 0;
-                right: 4px;
+                left: calc(100vw - min(200px, 37vw, 40vh) - 4px);
+                right: auto;
                 padding-left: 2px;
                 padding-right: 2px;
             }
 
             #wheel-svg {
-                width: min(210px, 36vw, 36vh);
-                height: min(210px, 36vw, 36vh);
+                width: min(190px, 35vw, 36vh);
+                height: min(190px, 35vw, 36vh);
             }
 
             .wedge-text {
@@ -2097,10 +2099,9 @@
             if (playerStates[firstPlayerIndex].selectedKnightOrder === "モンテサ騎士団") playerStates[firstPlayerIndex].knightPositions[4]={...firstPos};
             versusSetupPhase=null; isSelectingStart=false; clearSelectableHexes();
             loadPlayerState(firstPlayerIndex);
-            setInteractionMode("all");
             messageEl.style.color="#4ade80";
             messageEl.textContent=`ゲーム開始。先手：${playerStates[firstPlayerIndex].name}、後手：${playerStates[secondIndex].name}。`;
-            if (playerController === "bot-normal") scheduleBotTurn(220);
+            startCurrentPlayerTurn(220);
         }
 
         function startNewGameSelection() {
@@ -2722,14 +2723,44 @@
             playerStates[index].knightPositions={1:null,2:null,3:null,4:null};
         }
 
+        function startCurrentPlayerTurn(delay = 180) {
+            if (gameMode !== "versus" || gameEnded || !playerStates[currentPlayerIndex]) return;
+
+            const st = playerStates[currentPlayerIndex];
+            if (st.controller === "bot-normal") {
+                setInteractionMode("none");
+                messageEl.style.color = "#93c5fd";
+                messageEl.textContent = "BOT思考中…";
+
+                // 通常起動
+                scheduleBotTurn(delay);
+
+                // UI更新や状態切替でタイマーが消えた場合の保険。
+                setTimeout(() => {
+                    if (
+                        gameMode === "versus"
+                        && !gameEnded
+                        && playerController === "bot-normal"
+                        && !botIsExecutingTurn
+                        && !botTurnTimer
+                        && playerPosition
+                    ) {
+                        scheduleBotTurn(0);
+                    }
+                }, Math.max(700, delay + 400));
+            } else {
+                setInteractionMode("all");
+                messageEl.style.color = "#4ade80";
+                messageEl.textContent = `${st.name}の手番です。`;
+            }
+        }
+
         function completeCurrentTurn(message="") {
             if (gameMode !== "versus" || gameEnded) return;
             snapshotCurrentPlayerState();
             const next=1-currentPlayerIndex;
             loadPlayerState(next);
-            messageEl.style.color="#93c5fd";
-            messageEl.textContent=`${playerStates[next].name}の手番です。`;
-            if (playerController === "bot-normal") scheduleBotTurn(180);
+            startCurrentPlayerTurn(180);
         }
 
 
@@ -2938,6 +2969,9 @@
                 offsetY = e.clientY - rect.top;
                 wheelContainer.style.left = rect.left + "px";
                 wheelContainer.style.top = rect.top + "px";
+                wheelContainer.style.right = "auto";
+                wheelContainer.style.bottom = "auto";
+                wheelContainer.style.width = rect.width + "px";
                 wheelContainer.style.transform = "none";
                 wheelDragHandle.setPointerCapture(e.pointerId);
                 e.preventDefault();
@@ -4612,7 +4646,16 @@
         renderGameLog();
 
         function scheduleBotTurn(delay = BOT_THINK_DELAY) {
-            if (playerController !== "bot-normal" || gameEnded || !playerPosition) return;
+            if (playerController !== "bot-normal" || gameEnded) return;
+
+            // 対戦状態から位置を復元できる場合は、表示状態の一時的な不整合で停止させない。
+            if (!playerPosition && gameMode === "versus" && playerStates[currentPlayerIndex]?.knightPositions?.[1]) {
+                const p = playerStates[currentPlayerIndex].knightPositions[1];
+                playerPosition = {...p};
+                knightPositions[1] = {...p};
+            }
+            if (!playerPosition) return;
+
             if (botTurnTimer) clearTimeout(botTurnTimer);
             botTurnTimer = setTimeout(() => {
                 botTurnTimer = null;
@@ -4747,6 +4790,11 @@
         }
 
         function botTurn() {
+            if (!playerPosition && gameMode === "versus" && playerStates[currentPlayerIndex]?.knightPositions?.[1]) {
+                const p = playerStates[currentPlayerIndex].knightPositions[1];
+                playerPosition = {...p};
+                knightPositions[1] = {...p};
+            }
             if (playerController !== "bot-normal" || gameEnded || botIsExecutingTurn || !playerPosition) return;
             if (++botTurnCounter > BOT_MAX_TURNS) {
                 botLog("安全上限300手に到達。BOTを停止しました。");
