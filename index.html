@@ -3435,7 +3435,10 @@
             document.getElementById("finish-flex-action").addEventListener("click", () => {
                 finishFlexibleCombinedTurn("複合アクションを終了しました。");
             });
-            if (botIsExecutingTurn) setTimeout(botDriveFlexibleChooser, 0);
+            if (botIsExecutingTurn) {
+                armBotFailsafe();
+                setTimeout(botDriveFlexibleChooser, 0);
+            }
         }
 
         function getBuildBonusEffectTexts(hexInfo) {
@@ -3525,6 +3528,15 @@
             messageEl.style.color = "#f87171";
             const effective = allocated + bonus;
             const requiredText = required == null ? "実行可能な対象なし" : `必要コスト ${required}`;
+
+            // BOTは人間用の「やり直す／戻る」ボタンを待たない。
+            if (botIsExecutingTurn) {
+                botLog(`${actionName}：割当${allocated}＋ボーナス${bonus}では不足（${requiredText}）。この候補をスキップ`);
+                botActiveSubActionDetail = null;
+                setTimeout(() => showFlexibleCombinedChooser(`BOT：${actionName}は実行できないためスキップしました。`), 0);
+                return;
+            }
+
             messageEl.innerHTML = `${actionName}にコマ${allocated}個＋ボーナス${bonus}＝${effective}を割り当てましたが、コストが足りません（${requiredText}）。` +
                 `<button id="retry-flex-allocation" style="padding:4px 10px;cursor:pointer;">割り当てをやり直す</button>` +
                 `<button id="back-flex-action" style="padding:4px 10px;cursor:pointer;">アクション選択へ戻る</button>`;
@@ -3870,7 +3882,10 @@
                 messageEl.style.color = "#4ade80";
                 messageEl.textContent = `${executedAction} のアクション（強さ:${tokens}）完了。`;
             }
-            if (botIsExecutingTurn) setTimeout(() => botResolvePendingAction(executedAction), 0);
+            if (botIsExecutingTurn) {
+                armBotFailsafe();
+                setTimeout(() => botResolvePendingAction(executedAction), 0);
+            }
         }
 
         function getNeighbors(col, row) {
@@ -4382,7 +4397,7 @@
             });
 
             if (botIsExecutingTurn) {
-                setTimeout(() => botChooseSaracenReward(hexKey, hexInfo, canUsePrintedBonus), 0);
+                setTimeout(() => botChooseSaracenReward(hexKey, hexInfo, canUsePrintedBonus, continuationMessage), 0);
             }
         }
 
@@ -4643,6 +4658,8 @@
         let botFlexibleCursor = 0;
         let botActiveSubActionDetail = null;
         let botTurnTimer = null;
+        let botFailsafeTimer = null;
+        const BOT_FAILSAFE_MS = 2600;
         const botRecentKnightPositions = {};
 
         function botResetRuntime() {
@@ -4653,7 +4670,79 @@
             botActiveSubActionDetail = null;
             if (botTurnTimer) clearTimeout(botTurnTimer);
             botTurnTimer = null;
+            if (botFailsafeTimer) clearTimeout(botFailsafeTimer);
+            botFailsafeTimer = null;
             Object.keys(botRecentKnightPositions).forEach(k => delete botRecentKnightPositions[k]);
+        }
+
+        function armBotFailsafe() {
+            if (botFailsafeTimer) clearTimeout(botFailsafeTimer);
+            botFailsafeTimer = setTimeout(() => {
+                botFailsafeTimer = null;
+                if (!botIsExecutingTurn || gameEnded || playerController !== "bot-normal") return;
+
+                botLog("BOTフェイルセーフ：入力待ち状態を検出し自動復帰します");
+                hideChoiceModal();
+                enhancementInfoPending = false;
+
+                // サラセン選択が残っていれば最優先で解決。
+                const saracenVp = document.getElementById("saracen-choice-vp");
+                if (saracenVp) {
+                    saracenVp.click();
+                    return;
+                }
+
+                // 分配が止まっている場合は、合法マスへ残りコマを自動配置する。
+                if (isDistributingTokens && tokensToDistribute > 0) {
+                    let guard = 0;
+                    while (isDistributingTokens && tokensToDistribute > 0 && guard++ < 30) {
+                        const legal = getDistributionSelectableIndices();
+                        if (!legal.length) break;
+                        handleWedgeClick(legal[0]);
+                    }
+                    if (!isDistributingTokens) return;
+                    cancelCurrentDistribution();
+                    botCompleteTurn("BOT：分配フェイルセーフで手番を終了しました。");
+                    return;
+                }
+
+                // 移動は残り移動力を捨てて終了できる。
+                if (isSelectingMove) {
+                    endMoveAction();
+                    return;
+                }
+
+                // 建設・十字軍・招集のクリック待ちは断念して共通終了処理へ。
+                if (isSelectingBuild) {
+                    isSelectingBuild = false;
+                    selectedBuildKnight = null;
+                    clearBuildableHighlights();
+                    continueCombinedAction("BOT：建設入力待ちを自動終了しました。", "#f87171");
+                    return;
+                }
+                if (isSelectingCrusade) {
+                    isSelectingCrusade = false;
+                    clearSelectableHexes();
+                    clearKnightActionHighlights();
+                    continueCombinedAction("BOT：十字軍入力待ちを自動終了しました。", "#f87171");
+                    return;
+                }
+                if (isSelectingRecruit) {
+                    isSelectingRecruit = false;
+                    clearRecruitableHighlights();
+                    continueCombinedAction("BOT：招集入力待ちを自動終了しました。", "#f87171");
+                    return;
+                }
+
+                // 複合アクションの選択／数値入力待ちなら、残りを放棄して終了。
+                if (flexibleCombinedMode) {
+                    finishFlexibleCombinedTurn("BOT：複合アクションの入力待ちを自動終了しました。", "#f87171");
+                    return;
+                }
+
+                // その他の未知の停止状態でも人間へ手番を返す。
+                botCompleteTurn("BOT：停止状態を検出したため手番を自動終了しました。");
+            }, BOT_FAILSAFE_MS);
         }
 
         function botLog(text) {
@@ -4750,6 +4839,7 @@
                 botIsExecutingTurn = true;
                 botFlexibleCursor = 0;
                 botActiveSubActionDetail = null;
+                armBotFailsafe();
             }
 
             if (action.type === "wedge-action") {
@@ -5317,8 +5407,41 @@
                 }
             } else if (actionName === "十字軍") {
                 if (!isSelectingCrusade) return;
-                if (!detail?.knight) { isSelectingCrusade=false; continueCombinedAction("BOT：十字軍対象なし。", "#f87171"); return; }
-                handleKnightClick(detail.knight);
+
+                const getLegalCrusadeKnights = () => Object.entries(knightPositions)
+                    .filter(([, pos]) => {
+                        if (!pos) return false;
+                        const info = hexInfos[`${pos.c},${pos.r}`];
+                        return !!info && info.faction !== "なし" && getEnemyStrength(info.faction) <= availableCrusadePoints;
+                    })
+                    .map(([number]) => Number(number));
+
+                const legalBefore = getLegalCrusadeKnights();
+                const plannedKnight = Number(detail?.knight);
+                const firstChoice = legalBefore.includes(plannedKnight) ? plannedKnight : legalBefore[0];
+
+                if (!firstChoice) {
+                    isSelectingCrusade = false;
+                    clearSelectableHexes();
+                    clearKnightActionHighlights();
+                    continueCombinedAction("BOT：十字軍対象が不成立になったため終了します。", "#f87171");
+                    return;
+                }
+
+                handleKnightClick(firstChoice);
+
+                // 実行時点で対象が変化していた場合は、残っている合法対象を1回だけ再探索。
+                if (isSelectingCrusade) {
+                    const fallback = getLegalCrusadeKnights().find(n => n !== firstChoice);
+                    if (fallback) handleKnightClick(fallback);
+                }
+
+                if (isSelectingCrusade) {
+                    isSelectingCrusade = false;
+                    clearSelectableHexes();
+                    clearKnightActionHighlights();
+                    continueCombinedAction("BOT：十字軍を実行できなかったため、このアクションを終了します。", "#f87171");
+                }
             } else if (actionName === "招集") {
                 if (!isSelectingRecruit) return;
                 const idx=playerResources.buildingsBuilt["軍隊"];
@@ -5345,20 +5468,41 @@
             if (isSelectingMove) endMoveAction();
         }
 
-        function botChooseSaracenReward(hexKey, hexInfo, canUsePrintedBonus) {
+        function botChooseSaracenReward(hexKey, hexInfo, canUsePrintedBonus, continuationMessage = "BOTがサラセン人を撃破しました。") {
             if (!botIsExecutingTurn) return;
             const printed = canUsePrintedBonus ? getBotSaracenExpectedValue(hexKey,hexInfo) : -Infinity;
-            if (canUsePrintedBonus && printed > 3.15) {
+            const choosePrinted = canUsePrintedBonus && printed > 3.15;
+
+            if (choosePrinted) {
                 botLog(`サラセン撃破：${hexInfo?.saracenBonus || "印刷ボーナス"}を選択`);
-                document.getElementById("saracen-choice-bonus")?.click();
-            } else {
-                botLog("サラセン撃破：3勝利点を選択");
-                document.getElementById("saracen-choice-vp")?.click();
+                const btn = document.getElementById("saracen-choice-bonus");
+                if (btn && !btn.disabled) {
+                    btn.click();
+                    return;
+                }
+                // DOMボタンが生成されなかった場合も、共通効果関数で直接解決する。
+                const bonusMessage = executeSaracenDefeatBonus(hexKey, hexInfo);
+                updateStatusUI();
+                continueCombinedAction(`${continuationMessage}${bonusMessage}`);
+                return;
             }
+
+            botLog("サラセン撃破：3勝利点を選択");
+            const vpBtn = document.getElementById("saracen-choice-vp");
+            if (vpBtn) {
+                vpBtn.click();
+                return;
+            }
+            // DOMボタンがない場合のフェイルセーフ。
+            addVictoryPoints(3);
+            updateStatusUI();
+            continueCombinedAction(`${continuationMessage} 3勝利点を獲得しました。`);
         }
 
         function botCompleteTurn(message="") {
             if (!botIsExecutingTurn) return;
+            if (botFailsafeTimer) clearTimeout(botFailsafeTimer);
+            botFailsafeTimer = null;
             botIsExecutingTurn=false;
             botCurrentPlan=null;
             botFlexibleCursor=0;
