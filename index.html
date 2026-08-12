@@ -4763,8 +4763,28 @@
                 beginWedgeEnhancement(action.wedgeIndex);
                 if (action.controller === "bot") {
                     setTimeout(() => {
+                        enhancementInfoPending = false;
+                        hideChoiceModal();
+
                         beginEnhancementDistribution(action.distributionSourceIndex);
-                        setTimeout(() => botFeedDistribution(action.distributionSequence || []), 0);
+
+                        if (!isDistributingTokens) {
+                            const fallbackSource = board
+                                .map((tokens, i) => ({tokens, i}))
+                                .filter(x => x.tokens > 0)
+                                .sort((a, b) => b.tokens - a.tokens)[0]?.i;
+                            if (fallbackSource !== undefined) {
+                                beginEnhancementDistribution(fallbackSource);
+                            }
+                        }
+
+                        if (isDistributingTokens) {
+                            setTimeout(() => botFeedDistribution(action.distributionSequence || []), 0);
+                        } else {
+                            botLog("ウェッジ強化後の分配開始に失敗");
+                            cancelCurrentDistribution();
+                            botCompleteTurn("ウェッジ強化分配失敗");
+                        }
                     }, 0);
                 }
                 return true;
