@@ -1342,6 +1342,58 @@
             return points.join(" ");
         }
 
+        function getHexBonusCount(hexInfo) {
+            if (!hexInfo) return 0;
+            if (hexInfo.bonus && hexInfo.bonus !== "なし") return 1;
+            return Math.min(2, Array.isArray(hexInfo.bonusTileEffects) ? hexInfo.bonusTileEffects.length : 0);
+        }
+
+        function renderHexBonusBands(group, cx, cy, hexInfo) {
+            if (!group) return;
+            group.querySelectorAll(".bonus-band, .bonus-tile-marker, .fixed-bonus-star").forEach(el => el.remove());
+
+            const count = getHexBonusCount(hexInfo);
+            if (count <= 0) return;
+
+            // 中央寄せの「引両」風。帯の左右端は六角形の斜辺まで到達させる。
+            const bandOffsetY = HEX_SIZE * 0.23;
+            const bandHeight = 6;
+
+            const makeBand = (centerY) => {
+                const topY = centerY - bandHeight / 2;
+                const bottomY = centerY + bandHeight / 2;
+
+                // pointy-top六角形の左右斜辺との交点。
+                const halfWidthAtY = (y) => {
+                    const dy = Math.abs(y - cy);
+                    return HEX_SIZE - dy / Math.sqrt(3);
+                };
+
+                const topHalfWidth = halfWidthAtY(topY);
+                const bottomHalfWidth = halfWidthAtY(bottomY);
+
+                const band = document.createElementNS(SVG_NS, "polygon");
+                band.setAttribute("points", [
+                    `${cx - topHalfWidth},${topY}`,
+                    `${cx + topHalfWidth},${topY}`,
+                    `${cx + bottomHalfWidth},${bottomY}`,
+                    `${cx - bottomHalfWidth},${bottomY}`
+                ].join(" "));
+                band.setAttribute("fill", "#facc15");
+                band.setAttribute("stroke", "none");
+                band.style.pointerEvents = "none";
+                band.classList.add("bonus-band");
+                group.appendChild(band);
+            };
+
+            if (count === 1) {
+                makeBand(cy - bandOffsetY);
+            } else {
+                makeBand(cy - bandOffsetY);
+                makeBand(cy + bandOffsetY);
+            }
+        }
+
         const hexGroups = {}; // 座標キー毎のグループ要素保持用
         const hexInfos = {};  // マスごとの詳細情報保持用
         let playerPosition = null; // プレイヤーの現在地 {c, r}
@@ -1369,6 +1421,16 @@
             return playerController === "bot-normal" ? "ボット" : "プレイヤー";
         }
 
+        function updateMapBuildingLabelColor(hexKey) {
+            const info = hexInfos[hexKey];
+            const group = hexGroups[hexKey];
+            if (!info || !group) return;
+            const color = info.affiliation === "ボット" ? "#ffffff" : "#000000";
+            group.querySelectorAll(".map-building-label, .building-label").forEach(el => {
+                el.setAttribute("fill", color);
+            });
+        }
+
         function updateHexAffiliationVisual(hexKey) {
             const info = hexInfos[hexKey];
             const group = hexGroups[hexKey];
@@ -1387,6 +1449,7 @@
 
             info.affiliation = affiliation;
             polygon.style.fill = affiliationColors[affiliation] || affiliationColors["なし"];
+            updateMapBuildingLabelColor(hexKey);
         }
 
         function setHexAffiliation(hexKey, affiliation) {
@@ -1430,32 +1493,10 @@
                 };
                 hexInfos[posKey] = hexInfo;
 
-                if (hexInfo.bonusTiles > 0) {
-                    const bonusTileText = document.createElementNS(SVG_NS, "text");
-                    bonusTileText.setAttribute("x", cx - 18);
-                    bonusTileText.setAttribute("y", cy - 14);
-                    bonusTileText.setAttribute("fill", "#c084fc");
-                    bonusTileText.setAttribute("font-size", "11px");
-                    bonusTileText.setAttribute("font-weight", "bold");
-                    bonusTileText.setAttribute("text-anchor", "middle");
-                    bonusTileText.style.pointerEvents = "none";
-                    bonusTileText.classList.add("bonus-tile-marker");
-                    bonusTileText.textContent = hexInfo.bonusTiles === 2 ? "◆◆" : "◆";
-                    group.appendChild(bonusTileText);
-                }
-
                 if (fixedBonuses[posKey]) {
                     hexInfo.bonus = fixedBonuses[posKey];
-                    const star = document.createElementNS(SVG_NS, "text");
-                    star.setAttribute("x", cx);
-                    star.setAttribute("y", cy + 6);
-                    star.setAttribute("fill", "#facc15");
-                    star.setAttribute("font-size", "18px");
-                    star.setAttribute("text-anchor", "middle");
-                    star.textContent = "★";
-                    star.style.pointerEvents = "none";
-                    group.appendChild(star);
                 }
+                renderHexBonusBands(group, cx, cy, hexInfo);
 
                 if (col >= 3) {
                     const enemyType = enemyList[enemyIndex++];
@@ -2367,7 +2408,7 @@
                 const [col, row] = key.split(",").map(Number);
                 const info = hexInfos[key];
 
-                group.querySelectorAll(".enemy-token, .enemy-label, .bonus-tile-marker").forEach(el => el.remove());
+                group.querySelectorAll(".enemy-token, .enemy-label, .bonus-tile-marker, .fixed-bonus-star, .bonus-band").forEach(el => el.remove());
                 info.building = "空白";
                 info.memo = "";
                 info.bonus = fixedBonuses[key] || "なし";
@@ -2378,19 +2419,7 @@
                 let cy = row * Y_OFFSET;
                 if (col % 2 !== 0) cy += Y_OFFSET / 2;
 
-                if (info.bonusTiles > 0) {
-                    const bonusTileText = document.createElementNS(SVG_NS, "text");
-                    bonusTileText.setAttribute("x", cx - 18);
-                    bonusTileText.setAttribute("y", cy - 14);
-                    bonusTileText.setAttribute("fill", "#c084fc");
-                    bonusTileText.setAttribute("font-size", "11px");
-                    bonusTileText.setAttribute("font-weight", "bold");
-                    bonusTileText.setAttribute("text-anchor", "middle");
-                    bonusTileText.style.pointerEvents = "none";
-                    bonusTileText.classList.add("bonus-tile-marker");
-                    bonusTileText.textContent = info.bonusTiles === 2 ? "◆◆" : "◆";
-                    group.appendChild(bonusTileText);
-                }
+                renderHexBonusBands(group, cx, cy, info);
 
                 if (col >= 3) {
                     const enemyType = enemyList[resetEnemyIndex++];
@@ -4349,12 +4378,13 @@
                 bText.setAttribute("y", cy - 12);
                 bText.setAttribute("font-size", "10px");
                 bText.setAttribute("font-weight", "bold");
-                bText.setAttribute("fill", "#38bdf8");
+                bText.setAttribute("fill", hexInfo.affiliation === "ボット" ? "#ffffff" : "#000000");
                 bText.setAttribute("text-anchor", "middle");
                 bText.style.pointerEvents = "none";
                 bText.classList.add("building-label");
                 bText.textContent = buildingName;
                 group.appendChild(bText);
+                updateMapBuildingLabelColor(hexKey);
             }
             return ` 撃破ボーナス「${bonus}」：${buildingName}をコスト無視で建設。勝利点+${lv.p + mapVictoryBonus}${mapVictoryBonus ? `（ボーナスタイル+${mapVictoryBonus}）` : ""}${effectMessage ? `、${effectMessage}` : ""}。`;
         }
@@ -4618,12 +4648,13 @@
                     bText.setAttribute("y", cy - 12);
                     bText.setAttribute("font-size", "10px");
                     bText.setAttribute("font-weight", "bold");
-                    bText.setAttribute("fill", "#38bdf8");
+                    bText.setAttribute("fill", hexInfo.affiliation === "ボット" ? "#ffffff" : "#000000");
                     bText.setAttribute("text-anchor", "middle");
                     bText.style.pointerEvents = "none";
                     bText.classList.add("map-building-label");
                     bText.textContent = `[${building.name}]`;
                     hexGroups[currentKey].appendChild(bText);
+                    updateMapBuildingLabelColor(currentKey);
 
                     messageEl.style.color = "#4ade80";
                     messageEl.textContent = `${building.name} を建設しました！ 勝利点+${lv.p + mapVictoryBonus}${mapVictoryBonus ? `（ボーナスタイル+${mapVictoryBonus}）` : ""}。${bonusMessage}残り建設力: ${availableBuildPoints}`;
