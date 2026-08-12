@@ -302,6 +302,23 @@
             grid-column: 1 / -1;
         }
 
+        .status-action-row {
+            grid-column: 1 / -1;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            white-space: nowrap;
+            color: #cbd5e1;
+        }
+
+        .status-action-row strong {
+            color: #f8fafc;
+            font-weight: 800;
+            margin-left: 2px;
+        }
+
         /* ドラッグ可能なフローティング・アクションホイール */
         #wheel-container {
             position: fixed;
@@ -3963,11 +3980,13 @@
             <div class="status-item" style="grid-column:1 / -1;"><span class="status-label">騎士団</span><span class="status-value" id="status-knight-order">未選択</span></div>
             <div class="status-item"><span class="status-label">勝利点</span><span class="status-value" id="status-vp">0</span></div>
             <div class="status-item" id="defeat-status"><span class="status-label">撃破数</span><span class="status-value" id="status-defeated">サラセン人 0 / プロイセン人 0 / スラブ人 0</span></div>
-            <div class="status-item"><span class="status-label">移動力</span><span class="status-value" id="status-move">0</span></div>
-            <div class="status-item"><span class="status-label">建設力</span><span class="status-value" id="status-build">0</span></div>
-            <div class="status-item"><span class="status-label">招集力</span><span class="status-value" id="status-recruit">0</span></div>
-            <div class="status-item"><span class="status-label">影響力</span><span class="status-value" id="status-influence">0</span></div>
-            <div class="status-item"><span class="status-label">軍事力</span><span class="status-value" id="status-military">0</span></div>
+            <div class="status-action-row">
+                <span>移動 <strong id="status-move">0</strong></span>
+                <span>建設 <strong id="status-build">0</strong></span>
+                <span>招集 <strong id="status-recruit">0</strong></span>
+                <span>影響 <strong id="status-influence">0</strong></span>
+                <span>軍事 <strong id="status-military">0</strong></span>
+            </div>
         `;
         boardContainer.appendChild(statusPanel);
 
