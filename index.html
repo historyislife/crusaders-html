@@ -327,7 +327,7 @@
             top: 52%;
             transform: translateY(-50%);
             z-index: 200;
-            width: 232px;
+            width: var(--wheel-window-width, 232px);
             display: flex;
             flex-direction: column;
             justify-content: flex-start;
@@ -377,10 +377,31 @@
         }
 
         #wheel-svg {
-            width: 220px;
-            height: 220px;
-            max-width: 220px;
+            width: var(--wheel-svg-size, 220px);
+            height: var(--wheel-svg-size, 220px);
+            max-width: none;
             overflow: visible;
+        }
+
+        #wheel-resize-handle {
+            position: absolute;
+            right: 2px;
+            bottom: 2px;
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 5px;
+            color: #cbd5e1;
+            background: rgba(51, 65, 85, 0.9);
+            font-size: 14px;
+            line-height: 1;
+            cursor: nwse-resize;
+            user-select: none;
+            touch-action: none;
+            z-index: 999;
+            pointer-events: auto;
         }
 
         .wedge {
@@ -1131,6 +1152,7 @@
             <div id="wheel-svg-wrapper">
                 <svg id="wheel-svg" viewBox="-110 -110 220 220"></svg>
             </div>
+            <div id="wheel-resize-handle" title="ドラッグして拡大・縮小">↘</div>
         </div>
     </div>
 
@@ -3377,6 +3399,7 @@
 
         const wheelContainer = document.getElementById("wheel-container");
         const wheelDragHandle = document.getElementById("wheel-drag-handle");
+        const wheelResizeHandle = document.getElementById("wheel-resize-handle");
         const mapSectionEl = document.getElementById("map-section");
         const boardContainerEl = document.getElementById("board-container");
 
@@ -3409,7 +3432,9 @@
                 mapSectionEl.classList.add("window-front");
                 boardContainerEl.classList.add("window-front");
             } else {
-                wheelContainer.classList.add("window-front");
+        
+
+        wheelContainer.classList.add("window-front");
             }
         }
 
@@ -3423,6 +3448,93 @@
             wheelContainer.style.top = top + "px";
             wheelContainer.style.transform = "none";
         }
+
+        (function enableWheelResizing() {
+            const wheelSvgEl = document.getElementById("wheel-svg");
+            if (!wheelResizeHandle || !wheelSvgEl) return;
+
+            // 端末ごとのレスポンシブCSS適用後のサイズを「初期＝最小」とする。
+            const initialSvgRect = wheelSvgEl.getBoundingClientRect();
+            const initialWindowRect = wheelContainer.getBoundingClientRect();
+            const MIN_SVG_SIZE = Math.max(1, initialSvgRect.width || 220);
+            const MIN_WINDOW_WIDTH = Math.max(1, initialWindowRect.width || 232);
+            const MAX_SCALE = 2.5;
+
+            let resizing = false;
+            let startX = 0;
+            let startY = 0;
+            let startSvgSize = MIN_SVG_SIZE;
+
+            const getCurrentSvgSize = () => {
+                const rect = wheelSvgEl.getBoundingClientRect();
+                return rect.width || MIN_SVG_SIZE;
+            };
+
+            const applySize = (svgSize) => {
+                const clampedSvg = Math.max(
+                    MIN_SVG_SIZE,
+                    Math.min(MIN_SVG_SIZE * MAX_SCALE, svgSize)
+                );
+                const scale = clampedSvg / MIN_SVG_SIZE;
+                const windowWidth = MIN_WINDOW_WIDTH * scale;
+
+                // 後段のスマホ用 @media CSS より確実に優先する。
+                wheelSvgEl.style.setProperty("width", `${clampedSvg}px`, "important");
+                wheelSvgEl.style.setProperty("height", `${clampedSvg}px`, "important");
+                wheelSvgEl.style.setProperty("max-width", "none", "important");
+
+                wheelContainer.style.setProperty("width", `${windowWidth}px`, "important");
+                wheelContainer.style.setProperty("min-width", `${windowWidth}px`, "important");
+                wheelContainer.style.setProperty("max-width", "none", "important");
+
+                // 縦横比はホイール自体を常に1:1で固定。
+                wheelSvgEl.style.aspectRatio = "1 / 1";
+
+                keepWheelOnScreen();
+            };
+
+            wheelResizeHandle.addEventListener("pointerdown", e => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                resizing = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                startSvgSize = getCurrentSvgSize();
+
+                try {
+                    wheelResizeHandle.setPointerCapture(e.pointerId);
+                } catch (_) {}
+            });
+
+            wheelResizeHandle.addEventListener("pointermove", e => {
+                if (!resizing) return;
+                e.preventDefault();
+                e.stopPropagation();
+
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+
+                // 右下へドラッグ＝拡大、左上へドラッグ＝縮小。
+                // 横と縦の両方を使うのでタッチ操作でも反応しやすい。
+                const delta = (dx + dy) / 2;
+                applySize(startSvgSize + delta);
+            });
+
+            const stopResize = e => {
+                if (!resizing) return;
+                resizing = false;
+                try {
+                    if (e && wheelResizeHandle.hasPointerCapture(e.pointerId)) {
+                        wheelResizeHandle.releasePointerCapture(e.pointerId);
+                    }
+                } catch (_) {}
+            };
+
+            wheelResizeHandle.addEventListener("pointerup", stopResize);
+            wheelResizeHandle.addEventListener("pointercancel", stopResize);
+        })();
+
 
         (function enableWheelDragging() {
             let dragging = false;
