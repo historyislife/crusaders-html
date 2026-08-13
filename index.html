@@ -1684,35 +1684,53 @@
         let selectedMoveKnight = null;
         let selectedBuildKnight = null;
 
+        function sameKnightHex(a, b) {
+            return !!a && !!b && a.c === b.c && a.r === b.r;
+        }
+
+        function getOpponentKnightPositions() {
+            if (gameMode !== "versus" || !playerStates?.length) return [];
+            const other = playerStates[1-currentPlayerIndex];
+            return Object.values(other?.knightPositions || {}).filter(Boolean);
+        }
+
         function getKnightDisplayOffset(number) {
             const pos = knightPositions[number];
             if (!pos) return { x: 0, y: 0 };
 
             const occupants = Object.keys(knightPositions)
                 .map(Number)
-                .filter(n => knightPositions[n] && knightPositions[n].c === pos.c && knightPositions[n].r === pos.r)
+                .filter(n => knightPositions[n] && sameKnightHex(knightPositions[n], pos))
                 .sort((a, b) => a - b);
 
-            if (occupants.length <= 1) return { x: 0, y: 0 };
+            let ownOffset = { x: 0, y: 0 };
 
-            const index = occupants.indexOf(number);
             if (occupants.length === 2) {
-                return index === 0 ? { x: -10, y: 0 } : { x: 10, y: 0 };
+                const index = occupants.indexOf(number);
+                ownOffset = index === 0 ? { x: -8, y: 0 } : { x: 8, y: 0 };
+            } else if (occupants.length >= 3) {
+                const index = occupants.indexOf(number);
+                const offsets = occupants.length >= 4
+                    ? [
+                        { x: -7, y: -7 },
+                        { x: 7, y: -7 },
+                        { x: -7, y: 7 },
+                        { x: 7, y: 7 }
+                    ]
+                    : [
+                        { x: 0, y: -8 },
+                        { x: -8, y: 7 },
+                        { x: 8, y: 7 }
+                    ];
+                ownOffset = offsets[index] || { x: 0, y: 0 };
             }
 
-            const offsets = occupants.length >= 4
-                ? [
-                    { x: -9, y: -9 },
-                    { x: 9, y: -9 },
-                    { x: -9, y: 9 },
-                    { x: 9, y: 9 }
-                ]
-                : [
-                    { x: 0, y: -10 },
-                    { x: -10, y: 9 },
-                    { x: 10, y: 9 }
-                ];
-            return offsets[index] || { x: 0, y: 0 };
+            // 相手陣営の騎士が同じマスにいる場合、
+            // 現手番側は左へ大きく寄せる。
+            const hasOpponent = getOpponentKnightPositions().some(p => sameKnightHex(p, pos));
+            if (hasOpponent) ownOffset.x -= 15;
+
+            return ownOffset;
         }
 
         function updateKnightTokenPositions() {
@@ -1724,6 +1742,9 @@
                 let cy = pos.r * Y_OFFSET;
                 if (pos.c % 2 !== 0) cy += Y_OFFSET / 2;
                 cy += offset.y;
+
+                // 前回版で使ったtransformを残さない。
+                group.removeAttribute("transform");
 
                 const circles = group.querySelectorAll("circle");
                 circles.forEach(circle => {
@@ -1846,7 +1867,7 @@
             mapGroup.appendChild(group);
             extraKnightByNumber[number] = group;
             if (!extraKnightTokenElements.includes(group)) extraKnightTokenElements.push(group);
-            updateKnightTokenPositions();
+            refreshVersusKnightSeparation();
         }
 
         function getCastleEndGameBonus() {
@@ -1906,7 +1927,7 @@
             pGroup.appendChild(pText);
             mapGroup.appendChild(pGroup);
             playerTokenElement = pGroup;
-            updateKnightTokenPositions();
+            refreshVersusKnightSeparation();
         }
 
         function endMoveAction() {
@@ -2695,34 +2716,81 @@
         function renderInactivePlayerKnights() {
             if (inactiveKnightLayer) inactiveKnightLayer.remove();
             if (gameMode !== "versus") return;
+
             const other = playerStates[1-currentPlayerIndex];
             if (!other) return;
+
             inactiveKnightLayer = document.createElementNS(SVG_NS, "g");
             inactiveKnightLayer.style.pointerEvents = "none";
             const fill = other.controller === "bot-normal" ? "#020617" : "#22c55e";
-            Object.entries(other.knightPositions || {}).forEach(([num,pos]) => {
-                if (!pos) return;
-                let cx=pos.c*X_OFFSET, cy=pos.r*Y_OFFSET;
-                if (pos.c%2!==0) cy+=Y_OFFSET/2;
-                const c=document.createElementNS(SVG_NS,"circle");
-                c.setAttribute("cx",cx); c.setAttribute("cy",cy); c.setAttribute("r",9);
-                c.setAttribute("fill", Number(num)===4 ? "#111827" : fill);
+
+            const otherEntries = Object.entries(other.knightPositions || {})
+                .filter(([, pos]) => !!pos)
+                .sort((a, b) => Number(a[0]) - Number(b[0]));
+
+            const getOtherOwnOffset = (num, pos) => {
+                const occupants = otherEntries.filter(([, p]) => sameKnightHex(p, pos));
+                if (occupants.length <= 1) return { x: 0, y: 0 };
+
+                const index = occupants.findIndex(([n]) => n === num);
+                if (occupants.length === 2) {
+                    return index === 0 ? { x: -7, y: 0 } : { x: 7, y: 0 };
+                }
+
+                const offsets = occupants.length >= 4
+                    ? [{x:-6,y:-6},{x:6,y:-6},{x:-6,y:6},{x:6,y:6}]
+                    : [{x:0,y:-7},{x:-7,y:6},{x:7,y:6}];
+                return offsets[index] || { x: 0, y: 0 };
+            };
+
+            otherEntries.forEach(([num,pos]) => {
+                let cx = pos.c * X_OFFSET;
+                let cy = pos.r * Y_OFFSET;
+                if (pos.c % 2 !== 0) cy += Y_OFFSET / 2;
+
+                const ownOffset = getOtherOwnOffset(num, pos);
+                const hasCurrentPlayer = Object.values(knightPositions)
+                    .filter(Boolean)
+                    .some(activePos => sameKnightHex(activePos, pos));
+
+                // 非手番側は右へ寄せる。
+                cx += ownOffset.x + (hasCurrentPlayer ? 15 : 0);
+                cy += ownOffset.y;
+
+                const c = document.createElementNS(SVG_NS, "circle");
+                c.setAttribute("cx", cx);
+                c.setAttribute("cy", cy);
+                c.setAttribute("r", 9);
+                c.setAttribute("fill", Number(num) === 4 ? "#111827" : fill);
                 c.setAttribute("stroke", other.controller === "bot-normal" ? "#94a3b8" : "#ffffff");
-                c.setAttribute("stroke-width","2"); c.setAttribute("opacity","0.82");
+                c.setAttribute("stroke-width", "2");
+                c.setAttribute("opacity", "0.92");
                 inactiveKnightLayer.appendChild(c);
 
-                const knightGlyph=document.createElementNS(SVG_NS,"text");
-                knightGlyph.setAttribute("x",cx);
-                knightGlyph.setAttribute("y",cy+5);
-                knightGlyph.setAttribute("font-size","15px");
-                knightGlyph.setAttribute("font-weight","bold");
-                knightGlyph.setAttribute("fill","#ffffff");
-                knightGlyph.setAttribute("text-anchor","middle");
-                knightGlyph.setAttribute("opacity","0.9");
-                knightGlyph.textContent=other.controller === "bot-normal" ? "♞" : "♘";
+                const knightGlyph = document.createElementNS(SVG_NS, "text");
+                knightGlyph.setAttribute("x", cx);
+                knightGlyph.setAttribute("y", cy + 5);
+                knightGlyph.setAttribute("font-size", "15px");
+                knightGlyph.setAttribute("font-weight", "bold");
+                knightGlyph.setAttribute("fill", "#ffffff");
+                knightGlyph.setAttribute("text-anchor", "middle");
+                knightGlyph.setAttribute("opacity", "0.98");
+                knightGlyph.textContent = other.controller === "bot-normal" ? "♞" : "♘";
                 inactiveKnightLayer.appendChild(knightGlyph);
             });
+
             mapGroup.appendChild(inactiveKnightLayer);
+
+            // 相手側を描き直した後、現手番側も同じ盤面状態で再計算。
+            updateKnightTokenPositions();
+        }
+
+        function refreshVersusKnightSeparation() {
+            if (gameMode !== "versus") {
+                updateKnightTokenPositions();
+                return;
+            }
+            renderInactivePlayerKnights();
         }
 
         function refreshCurrentPlayerBoardTiles() {
@@ -2757,7 +2825,7 @@
             refreshCurrentPlayerBoardTiles();
             if (knightPositions[1]) setPlayerPosition(knightPositions[1].c, knightPositions[1].r);
             [2,3,4].forEach(n=>{ const p=st.knightPositions?.[n]; if(p) placeExtraKnightToken(p.c,p.r,n); });
-            renderInactivePlayerKnights();
+            refreshVersusKnightSeparation();
             updateStatusUI();
             botResetRuntime();
         }
@@ -4059,15 +4127,10 @@
                         const currentBuiltCount = playerResources.buildingsBuilt[building.name];
                         const lv = building.levels[currentBuiltCount];
                         if (!lv) return false;
-                        let finalCost = lv.c;
-                        if (hexInfo && hexInfo.bonus) {
-                            const bonusText = hexInfo.bonus;
-                            if (bonusText.includes(building.name) && bonusText.includes("コスト-1")) {
-                                finalCost = Math.max(0, finalCost - 1);
-                            } else if (bonusText.includes("城、教会、農場、銀行コスト-1")) {
-                                finalCost = Math.max(0, finalCost - 1);
-                            }
-                        }
+
+                        // 建設可否判定も実際の支払いと同じ共通計算を使用する。
+                        // 固定ボーナス／ボーナスタイル、-1／-2、複数効果をすべて反映。
+                        const finalCost = getFinalBuildCost(lv.c, hexInfo, building.name);
                         return availableBuildPoints >= finalCost;
                     });
                 });
@@ -4778,6 +4841,7 @@
                         return;
                     }
 
+                    const costReduction = getBuildCostReduction(hexInfo, building.name);
                     const finalCost = getFinalBuildCost(lv.c, hexInfo, building.name);
 
                     if (availableBuildPoints < finalCost) {
@@ -4792,73 +4856,13 @@
                     addVictoryPoints(lv.p + mapVictoryBonus);
 
                     const builtLevel = playerResources.buildingsBuilt[building.name];
-                    let bonusMessage = "";
-
-                    if (building.name === "城") {
-                        if (builtLevel === 1) {
-                            placeExtraKnightToken(playerPosition.c, playerPosition.r, 2);
-                            playerResources.bonuses.move += 1;
-                            bonusMessage = " 2個目の騎士コマを配置、移動力+1。";
-                        } else if (builtLevel === 2) {
-                            playerResources.bonuses.move += 1;
-                            bonusMessage = " 移動力+1。";
-                        } else if (builtLevel === 3) {
-                            placeExtraKnightToken(playerPosition.c, playerPosition.r, 3);
-                            playerResources.bonuses.military += 1;
-                            bonusMessage = " 3個目の騎士コマを配置、軍事力+1。";
-                        } else if (builtLevel === 4) {
-                            playerResources.endGameBonuses.castleEnemySet = true;
-                            bonusMessage = " ゲーム終了時、異教徒コマ3種1セットごとに4勝利点。";
-                        }
-                    } else if (building.name === "教会") {
-                        if (builtLevel === 1) {
-                            playerResources.bonuses.influence += 1;
-                            bonusMessage = " 影響力+1。";
-                        } else if (builtLevel === 2) {
-                            playerResources.bonuses.influence += 1;
-                            bonusMessage = " 影響力+1。";
-                        } else if (builtLevel === 3) {
-                            playerResources.bonuses.influence += 1;
-                            playerResources.bonuses.move += 1;
-                            bonusMessage = " 影響力+1、移動力+1。";
-                        } else if (builtLevel === 4) {
-                            addVictoryPoints(6);
-                            bonusMessage = " 勝利点+6。";
-                        }
-                    } else if (building.name === "農場") {
-                        if (builtLevel === 1) {
-                            playerResources.bonuses.recruit += 1;
-                            bonusMessage = " 招集力+1。";
-                        } else if (builtLevel === 2) {
-                            playerResources.bonuses.recruit += 1;
-                            bonusMessage = " 招集力+1。";
-                        } else if (builtLevel === 3) {
-                            playerResources.bonuses.influence += 1;
-                            playerResources.bonuses.recruit += 1;
-                            bonusMessage = " 影響力+1、招集力+1。";
-                        } else if (builtLevel === 4) {
-                            playerResources.endGameBonuses.farmKnightArmy = true;
-                            bonusMessage = " ゲーム終了時、盤上の自分の騎士コマ+有効な軍隊タイルの数だけ1勝利点。";
-                        }
-                    } else if (building.name === "銀行") {
-                        if (builtLevel === 1) {
-                            playerResources.bonuses.build += 1;
-                            bonusMessage = " 建設力+1。";
-                        } else if (builtLevel === 2) {
-                            playerResources.bonuses.build += 1;
-                            bonusMessage = " 建設力+1。";
-                        } else if (builtLevel === 3) {
-                            playerResources.bonuses.influence += 1;
-                            playerResources.bonuses.build += 1;
-                            bonusMessage = " 影響力+1、建設力+1。";
-                        } else if (builtLevel === 4) {
-                            playerResources.endGameBonuses.bankLevel4Buildings = true;
-                            bonusMessage = " ゲーム終了時、レベル4の建物の数だけ4勝利点。";
-                        }
-                    }
-
-                    tile.style.opacity = "0.3";
-                    tile.style.pointerEvents = "none";
+                    const effectMessage = applyBuildingLevelEffects(
+                        building.name,
+                        builtLevel,
+                        playerPosition.c,
+                        playerPosition.r
+                    );
+                    const bonusMessage = effectMessage ? ` ${effectMessage}。` : "";
 
                     hexBuildings[currentKey] = building.name;
                     hexInfo.building = building.name;
@@ -4883,12 +4887,18 @@
                     updateMapBuildingLabelColor(currentKey);
 
                     messageEl.style.color = "#4ade80";
-                    messageEl.textContent = `${building.name} を建設しました！ 勝利点+${lv.p + mapVictoryBonus}${mapVictoryBonus ? `（ボーナスタイル+${mapVictoryBonus}）` : ""}。${bonusMessage}残り建設力: ${availableBuildPoints}`;
+                    messageEl.textContent = `${building.name} を建設しました！ ` +
+                        `建設コスト${lv.c}${costReduction ? `→${finalCost}（マス効果-${costReduction}）` : ""}。` +
+                        `勝利点+${lv.p + mapVictoryBonus}${mapVictoryBonus ? `（ボーナスタイル+${mapVictoryBonus}）` : ""}。` +
+                        `${bonusMessage}残り建設力: ${availableBuildPoints}`;
                     isSelectingBuild = false;
                     selectedBuildKnight = null;
                     clearBuildableHighlights();
                     updateStatusUI();
-                    continueCombinedAction(`${building.name} を建設しました！ 勝利点+${lv.p + mapVictoryBonus}${mapVictoryBonus ? `（ボーナスタイル+${mapVictoryBonus}）` : ""}。${bonusMessage}残り建設力: ${availableBuildPoints}`);
+                    continueCombinedAction(`${building.name} を建設しました！ ` +
+                        `建設コスト${lv.c}${costReduction ? `→${finalCost}（マス効果-${costReduction}）` : ""}。` +
+                        `勝利点+${lv.p + mapVictoryBonus}${mapVictoryBonus ? `（ボーナスタイル+${mapVictoryBonus}）` : ""}。` +
+                        `${bonusMessage}残り建設力: ${availableBuildPoints}`);
                 });
 
                 tileWrapper.appendChild(tile);
