@@ -1276,6 +1276,18 @@
             --wheel-safe-top: 8px;
         }
 
+
+        /* マップ内部ズーム：外枠は固定、地図だけ拡縮 */
+        #map-section,
+        #map-svg {
+            touch-action: none;
+        }
+
+        #map-svg {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
     </style>
 </head>
 <body>
@@ -1664,6 +1676,266 @@
         const mapGroup = document.createElementNS(SVG_NS, "g");
         mapGroup.setAttribute("transform", "translate(78, 40)");
         mapSvg.appendChild(mapGroup);
+
+
+        // ==========================================
+        // マップ内部ズーム／パン
+        // 外枠サイズは変更せず、SVG viewBox だけを操作する。
+        // 初期表示 = 最小倍率 1.0x
+        // ==========================================
+        const MAP_INITIAL_VIEWBOX = { x: 36, y: 18, w: 410, h: 370 };
+        const MAP_MIN_ZOOM = 1;
+        const MAP_MAX_ZOOM = 3.5;
+
+        let mapZoom = MAP_MIN_ZOOM;
+        let mapViewBox = { ...MAP_INITIAL_VIEWBOX };
+        const mapTouchPointers = new Map();
+        let mapPinchStart = null;
+
+        function clampMapViewBox(vb) {
+            const minX = MAP_INITIAL_VIEWBOX.x;
+            const minY = MAP_INITIAL_VIEWBOX.y;
+            const maxX = MAP_INITIAL_VIEWBOX.x + MAP_INITIAL_VIEWBOX.w - vb.w;
+            const maxY = MAP_INITIAL_VIEWBOX.y + MAP_INITIAL_VIEWBOX.h - vb.h;
+
+            vb.x = Math.max(minX, Math.min(vb.x, Math.max(minX, maxX)));
+            vb.y = Math.max(minY, Math.min(vb.y, Math.max(minY, maxY)));
+            return vb;
+        }
+
+        function applyMapViewBox(vb) {
+            mapViewBox = clampMapViewBox({ ...vb });
+            mapSvg.setAttribute(
+                "viewBox",
+                `${mapViewBox.x} ${mapViewBox.y} ${mapViewBox.w} ${mapViewBox.h}`
+            );
+        }
+
+        function setMapZoomAtClientPoint(newZoom, clientX, clientY, anchorWorld = null) {
+            const rect = mapSvg.getBoundingClientRect();
+            if (!rect.width || !rect.height) return;
+
+            const z = Math.max(MAP_MIN_ZOOM, Math.min(MAP_MAX_ZOOM, newZoom));
+            const rx = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+            const ry = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+
+            const world = anchorWorld || {
+                x: mapViewBox.x + rx * mapViewBox.w,
+                y: mapViewBox.y + ry * mapViewBox.h
+            };
+
+            const newW = MAP_INITIAL_VIEWBOX.w / z;
+            const newH = MAP_INITIAL_VIEWBOX.h / z;
+
+            mapZoom = z;
+            applyMapViewBox({
+                x: world.x - rx * newW,
+                y: world.y - ry * newH,
+                w: newW,
+                h: newH
+            });
+        }
+
+        function resetMapZoom() {
+            mapZoom = MAP_MIN_ZOOM;
+            applyMapViewBox({ ...MAP_INITIAL_VIEWBOX });
+        }
+
+        function mapPointerDistance(a, b) {
+            return Math.hypot(a.x - b.x, a.y - b.y);
+        }
+
+        function mapPointerMidpoint(a, b) {
+            return {
+                x: (a.x + b.x) / 2,
+                y: (a.y + b.y) / 2
+            };
+        }
+
+        // PC：ホイールでカーソル位置を中心に拡縮。
+        mapSvg.addEventListener("wheel", e => {
+            e.preventDefault();
+
+            const factor = e.deltaY < 0 ? 1.16 : 1 / 1.16;
+            const nextZoom = Math.max(
+                MAP_MIN_ZOOM,
+                Math.min(MAP_MAX_ZOOM, mapZoom * factor)
+            );
+
+            setMapZoomAtClientPoint(nextZoom, e.clientX, e.clientY);
+        }, { passive: false });
+
+        // PC／スマホ：拡大時のパン + スマホ2本指ピンチ。
+        let mapPanPointerId = null;
+        let mapPanStart = null;
+
+        function clientDeltaToWorld(dx, dy) {
+            const rect = mapSvg.getBoundingClientRect();
+            if (!rect.width || !rect.height) return { dx: 0, dy: 0 };
+            return {
+                dx: dx * (mapViewBox.w / rect.width),
+                dy: dy * (mapViewBox.h / rect.height)
+            };
+        }
+
+        mapSvg.addEventListener("pointerdown", e => {
+            const point = { x: e.clientX, y: e.clientY };
+
+            if (e.pointerType === "touch") {
+                mapTouchPointers.set(e.pointerId, point);
+
+                try {
+                    mapSvg.setPointerCapture(e.pointerId);
+                } catch (_) {}
+
+                // 2本指になったらパンを解除してピンチへ切り替える。
+                if (mapTouchPointers.size === 2) {
+                    mapPanPointerId = null;
+                    mapPanStart = null;
+
+                    const pts = [...mapTouchPointers.values()];
+                    const mid = mapPointerMidpoint(pts[0], pts[1]);
+                    const rect = mapSvg.getBoundingClientRect();
+
+                    const rx = (mid.x - rect.left) / rect.width;
+                    const ry = (mid.y - rect.top) / rect.height;
+
+                    mapPinchStart = {
+                        distance: Math.max(1, mapPointerDistance(pts[0], pts[1])),
+                        zoom: mapZoom,
+                        anchorWorld: {
+                            x: mapViewBox.x + rx * mapViewBox.w,
+                            y: mapViewBox.y + ry * mapViewBox.h
+                        }
+                    };
+
+                    e.preventDefault();
+                    return;
+                }
+
+                // 1本指：拡大時のみパン。
+                if (mapZoom > MAP_MIN_ZOOM) {
+                    mapPanPointerId = e.pointerId;
+                    mapPanStart = {
+                        clientX: e.clientX,
+                        clientY: e.clientY,
+                        viewBox: { ...mapViewBox }
+                    };
+                    e.preventDefault();
+                }
+                return;
+            }
+
+            // PC：左クリックドラッグでパン。拡大時のみ。
+            if (e.pointerType === "mouse" && e.button === 0 && mapZoom > MAP_MIN_ZOOM) {
+                mapPanPointerId = e.pointerId;
+                mapPanStart = {
+                    clientX: e.clientX,
+                    clientY: e.clientY,
+                    viewBox: { ...mapViewBox }
+                };
+
+                try {
+                    mapSvg.setPointerCapture(e.pointerId);
+                } catch (_) {}
+
+                mapSvg.style.cursor = "grabbing";
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        mapSvg.addEventListener("pointermove", e => {
+            if (e.pointerType === "touch" && mapTouchPointers.has(e.pointerId)) {
+                mapTouchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+                // 2本指ピンチ＋パン。
+                if (mapTouchPointers.size === 2 && mapPinchStart) {
+                    const pts = [...mapTouchPointers.values()];
+                    const mid = mapPointerMidpoint(pts[0], pts[1]);
+                    const distance = Math.max(1, mapPointerDistance(pts[0], pts[1]));
+                    const nextZoom = mapPinchStart.zoom * (distance / mapPinchStart.distance);
+
+                    setMapZoomAtClientPoint(
+                        nextZoom,
+                        mid.x,
+                        mid.y,
+                        mapPinchStart.anchorWorld
+                    );
+
+                    e.preventDefault();
+                    return;
+                }
+            }
+
+            // 1本指またはPCドラッグのパン。
+            if (
+                mapPanPointerId === e.pointerId &&
+                mapPanStart &&
+                mapZoom > MAP_MIN_ZOOM
+            ) {
+                const delta = clientDeltaToWorld(
+                    e.clientX - mapPanStart.clientX,
+                    e.clientY - mapPanStart.clientY
+                );
+
+                // 指／マウスを右へ動かすと地図も右へ動く見え方にする。
+                applyMapViewBox({
+                    x: mapPanStart.viewBox.x - delta.dx,
+                    y: mapPanStart.viewBox.y - delta.dy,
+                    w: mapPanStart.viewBox.w,
+                    h: mapPanStart.viewBox.h
+                });
+
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        function endMapPointer(e) {
+            if (e.pointerType === "touch") {
+                mapTouchPointers.delete(e.pointerId);
+
+                if (mapTouchPointers.size < 2) {
+                    mapPinchStart = null;
+                }
+            }
+
+            if (mapPanPointerId === e.pointerId) {
+                mapPanPointerId = null;
+                mapPanStart = null;
+                mapSvg.style.cursor = "";
+            }
+
+            try {
+                if (mapSvg.hasPointerCapture(e.pointerId)) {
+                    mapSvg.releasePointerCapture(e.pointerId);
+                }
+            } catch (_) {}
+        }
+
+        mapSvg.addEventListener("pointerup", endMapPointer);
+        mapSvg.addEventListener("pointercancel", endMapPointer);
+
+        // 拡大中はPCでドラッグ可能だと分かるカーソル。
+        mapSvg.addEventListener("pointerenter", e => {
+            if (e.pointerType === "mouse" && mapZoom > MAP_MIN_ZOOM) {
+                mapSvg.style.cursor = "grab";
+            }
+        });
+
+        mapSvg.addEventListener("pointerleave", e => {
+            if (mapPanPointerId === null) {
+                mapSvg.style.cursor = "";
+            }
+        });
+
+        // ダブルクリック／ダブルタップ相当で初期倍率へ戻す。
+        mapSvg.addEventListener("dblclick", e => {
+            e.preventDefault();
+            resetMapZoom();
+        });
+
+        // 初期表示は必ず最小倍率。
+        resetMapZoom();
 
         function positionPopupElement(popupEl, clientX, clientY, offset = 15) {
             const pad = 8;
@@ -3646,7 +3918,6 @@
         
 
         wheelContainer.classList.add("window-front");
-        requestAnimationFrame(() => keepWheelInSafeArea());
             }
         }
 
@@ -3662,84 +3933,67 @@
         }
 
 
-        function getWheelBlockerRects() {
-            const margin = 8;
-            return [
+        function keepWheelOutOfHudWindows() {
+            if (!wheelContainer) return;
+
+            const blockers = [
                 document.getElementById("map-toolbar-window"),
                 document.getElementById("map-score-window"),
                 document.getElementById("status-window")
-            ].filter(Boolean).map(el => {
-                const r = el.getBoundingClientRect();
-                return {left:r.left-margin, top:r.top-margin, right:r.right+margin, bottom:r.bottom+margin};
-            });
-        }
+            ].filter(Boolean);
 
-        function wheelRectAt(left, top) {
-            return {left, top, right:left + wheelContainer.offsetWidth, bottom:top + wheelContainer.offsetHeight};
-        }
+            const margin = 6;
+            let rect = wheelContainer.getBoundingClientRect();
+            let left = rect.left;
+            let top = rect.top;
 
-        function rectsOverlap(a,b) {
-            return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-        }
+            const overlaps = (a, b) =>
+                a.left < b.right + margin &&
+                a.right > b.left - margin &&
+                a.top < b.bottom + margin &&
+                a.bottom > b.top - margin;
 
-        function resolveWheelPosition(left, top) {
-            const margin = 4;
-            const w = wheelContainer.offsetWidth;
-            const h = wheelContainer.offsetHeight;
-            const maxLeft = Math.max(margin, window.innerWidth - w - margin);
-            const maxTop = Math.max(margin, window.innerHeight - h - margin);
-            left = Math.min(Math.max(margin,left),maxLeft);
-            top = Math.min(Math.max(margin,top),maxTop);
-            const blockers=getWheelBlockerRects();
-            if (!blockers.some(b=>rectsOverlap(wheelRectAt(left,top),b))) return {left,top};
+            // 数回繰り返して、複数ウインドウとの重なりも解消。
+            for (let pass = 0; pass < 4; pass++) {
+                rect = {
+                    left,
+                    top,
+                    right: left + wheelContainer.offsetWidth,
+                    bottom: top + wheelContainer.offsetHeight
+                };
 
-            // 候補を「遮蔽物の上下左右」に作り、現在位置から最も近い合法位置へスナップ。
-            const candidates=[{left,top}];
-            for (const b of blockers) {
-                candidates.push(
-                    {left:b.left-w, top}, {left:b.right, top},
-                    {left, top:b.top-h}, {left, top:b.bottom},
-                    {left:b.left-w, top:b.top-h}, {left:b.right, top:b.top-h},
-                    {left:b.left-w, top:b.bottom}, {left:b.right, top:b.bottom}
-                );
-            }
-            const legal=[];
-            for (const c of candidates) {
-                const x=Math.min(Math.max(margin,c.left),maxLeft);
-                const y=Math.min(Math.max(margin,c.top),maxTop);
-                const rr=wheelRectAt(x,y);
-                if (!blockers.some(b=>rectsOverlap(rr,b))) {
-                    const d=(x-left)*(x-left)+(y-top)*(y-top);
-                    legal.push({left:x,top:y,d});
+                let changed = false;
+                for (const blocker of blockers) {
+                    const b = blocker.getBoundingClientRect();
+                    if (!overlaps(rect, b)) continue;
+
+                    // まず下へ逃がす。入らなければ左へ逃がす。
+                    const below = b.bottom + margin;
+                    if (below + rect.bottom - rect.top <= window.innerHeight - margin) {
+                        top = below;
+                    } else {
+                        left = Math.max(margin, b.left - (rect.right - rect.left) - margin);
+                    }
+                    changed = true;
+                    break;
                 }
+                if (!changed) break;
             }
-            if (legal.length) {
-                legal.sort((a,b)=>a.d-b.d);
-                return legal[0];
-            }
-            // 画面が狭すぎて合法位置が無い場合は、最も重なり面積が小さい位置を選ぶ。
-            const grid=[];
-            for (let y=margin; y<=maxTop; y+=24) for (let x=margin; x<=maxLeft; x+=24) {
-                const rr=wheelRectAt(x,y); let area=0;
-                for (const b of blockers) {
-                    const iw=Math.max(0,Math.min(rr.right,b.right)-Math.max(rr.left,b.left));
-                    const ih=Math.max(0,Math.min(rr.bottom,b.bottom)-Math.max(rr.top,b.top));
-                    area+=iw*ih;
-                }
-                grid.push({left:x,top:y,area,d:(x-left)*(x-left)+(y-top)*(y-top)});
-            }
-            grid.sort((a,b)=>a.area-b.area || a.d-b.d);
-            return grid[0] || {left,top};
+
+            const maxLeft = Math.max(margin, window.innerWidth - wheelContainer.offsetWidth - margin);
+            const maxTop = Math.max(margin, window.innerHeight - wheelContainer.offsetHeight - margin);
+            left = Math.min(Math.max(margin, left), maxLeft);
+            top = Math.min(Math.max(margin, top), maxTop);
+
+            wheelContainer.style.left = `${left}px`;
+            wheelContainer.style.top = `${top}px`;
+            wheelContainer.style.right = "auto";
+            wheelContainer.style.bottom = "auto";
         }
 
         function keepWheelInSafeArea() {
-            const r=wheelContainer.getBoundingClientRect();
-            const p=resolveWheelPosition(r.left,r.top);
-            wheelContainer.style.left=`${p.left}px`;
-            wheelContainer.style.top=`${p.top}px`;
-            wheelContainer.style.right="auto";
-            wheelContainer.style.bottom="auto";
-            wheelContainer.style.transform="none";
+            keepWheelOnScreen();
+            keepWheelOutOfHudWindows();
         }
 
         (function enableWheelResizing() {
@@ -3861,11 +4115,10 @@
                 if (!dragging) return;
                 const maxLeft = Math.max(0, window.innerWidth - wheelContainer.offsetWidth);
                 const maxTop = Math.max(0, window.innerHeight - wheelContainer.offsetHeight);
-                const wantedLeft = Math.max(0, Math.min(e.clientX - offsetX, maxLeft));
-                const wantedTop = Math.max(0, Math.min(e.clientY - offsetY, maxTop));
-                const safe = resolveWheelPosition(wantedLeft, wantedTop);
-                wheelContainer.style.left = safe.left + "px";
-                wheelContainer.style.top = safe.top + "px";
+                const left = Math.max(0, Math.min(e.clientX - offsetX, maxLeft));
+                const top = Math.max(0, Math.min(e.clientY - offsetY, maxTop));
+                wheelContainer.style.left = left + "px";
+                wheelContainer.style.top = top + "px";
             });
 
             const stopDrag = (e) => {
@@ -3876,8 +4129,8 @@
             };
             wheelDragHandle.addEventListener("pointerup", stopDrag);
             wheelDragHandle.addEventListener("pointercancel", stopDrag);
-            window.addEventListener("resize", keepWheelInSafeArea);
-            window.addEventListener("orientationchange", () => setTimeout(keepWheelInSafeArea, 50));
+            window.addEventListener("resize", keepWheelOnScreen);
+            window.addEventListener("orientationchange", () => setTimeout(keepWheelOnScreen, 50));
         })();
 
         wheelContainer.classList.add("window-front");
