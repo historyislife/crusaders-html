@@ -1070,6 +1070,212 @@
             box-sizing: border-box;
         }
 
+
+        /* 常時前面HUD：操作、スコア、ステータス */
+        #map-hud-area {
+            position: relative;
+            z-index: 12000 !important;
+            isolation: isolate;
+        }
+
+        #map-toolbar-window,
+        #map-score-window {
+            position: relative;
+            z-index: 12010 !important;
+        }
+
+        #status-window {
+            position: relative;
+            z-index: 12020 !important;
+            width: 100%;
+            flex: 0 0 auto;
+            box-sizing: border-box;
+            border: 1px solid #475569;
+            border-radius: 8px;
+            background: #111827;
+            box-shadow: 0 6px 18px rgba(0,0,0,.34);
+            overflow: hidden;
+        }
+
+        #status-window-title {
+            padding: 4px 8px;
+            border-bottom: 1px solid #475569;
+            background: #1e293b;
+            color: #fde047;
+            font-size: .68rem;
+            font-weight: 900;
+            letter-spacing: .08em;
+        }
+
+        #status-window-content {
+            padding: 4px;
+        }
+
+        #status-window #status-panel {
+            margin: 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* 通常のマップ・ボード・ホイールより常に前へ。
+           モーダル（MANUAL/GAME LOG/結果/AUTO TEST）はさらに上位のまま。 */
+        #map-section,
+        #board-container,
+        #wheel-container {
+            z-index: 400;
+        }
+
+        @media (max-width: 760px) {
+            #status-window-title {
+                padding: 3px 6px;
+                font-size: .60rem;
+            }
+            #status-window-content {
+                padding: 2px;
+            }
+            #status-window #status-panel {
+                padding: 5px;
+                gap: 3px 6px;
+                font-size: .64rem;
+            }
+        }
+
+
+        /* 右上STATUS配置＋プレイヤーボードのサイズバランス */
+        #status-window {
+            width: 100%;
+            flex: 0 0 auto;
+            margin: 0 0 6px 0;
+        }
+
+        #status-window-title {
+            padding: 3px 7px;
+            font-size: .64rem;
+        }
+
+        #status-window-content {
+            padding: 3px;
+        }
+
+        #status-window #status-panel {
+            grid-template-columns: auto minmax(0, 1fr);
+            gap: 3px 8px;
+            padding: 6px 8px;
+            font-size: .69rem;
+        }
+
+        #status-window #status-panel > .status-item:first-child,
+        #status-window #defeat-status,
+        #status-window .status-action-row {
+            grid-column: 1 / -1;
+        }
+
+        #status-window .status-action-row {
+            gap: 7px;
+            justify-content: flex-start;
+            flex-wrap: nowrap;
+        }
+
+        /* STATUSを外へ出した分、ボードは右欄の残りを自然に使用 */
+        #board-container {
+            flex: 1 1 0;
+            padding: 11px 12px 8px;
+            gap: 8px;
+        }
+
+        .building-row {
+            gap: 7px;
+        }
+
+        .building-tiles {
+            gap: 4px;
+        }
+
+        @media (orientation: landscape) and (max-width: 1180px) {
+            #ui-section {
+                min-width: min(350px, 40vw);
+            }
+
+            #status-window {
+                margin-bottom: 4px;
+            }
+
+            #status-window #status-panel {
+                padding: 4px 6px;
+                gap: 2px 6px;
+                font-size: .63rem;
+            }
+
+            #board-container {
+                padding: 7px 8px 5px;
+                gap: 5px;
+            }
+        }
+
+        @media (orientation: landscape) and (max-height: 520px) {
+            #status-window-title {
+                padding: 2px 5px;
+                font-size: .56rem;
+            }
+
+            #status-window-content {
+                padding: 1px;
+            }
+
+            #status-window #status-panel {
+                padding: 3px 5px;
+                gap: 1px 5px;
+                font-size: .58rem;
+            }
+
+            #board-container {
+                padding: 5px 6px 4px;
+                gap: 3px;
+            }
+        }
+
+        @media (max-width: 760px) and (orientation: portrait) {
+            #status-window {
+                margin-bottom: 4px;
+            }
+
+            #status-window #status-panel {
+                padding: 4px 5px;
+                font-size: .61rem;
+            }
+
+            #board-container {
+                padding: 7px;
+                gap: 5px;
+            }
+        }
+
+
+        /* STATUS見出しなし・撃破数を1行固定 */
+        #status-window-content {
+            padding: 3px;
+        }
+
+        #status-defeated {
+            white-space: nowrap;
+            flex-wrap: nowrap;
+        }
+
+        #status-defeated .status-value,
+        #status-defeated #status-defeated,
+        #status-defeated {
+            white-space: nowrap;
+        }
+
+        #status-defeated > .status-value {
+            min-width: max-content;
+        }
+
+        /* アクションホイールはHUD/STATUS領域へ潜り込ませない */
+        #wheel-container {
+            --wheel-safe-top: 8px;
+        }
+
     </style>
 </head>
 <body>
@@ -1143,7 +1349,12 @@
 
     <!-- 画面右側：UI -->
     <div id="ui-section">
-        <!-- 上部：ボード -->
+        <!-- 右上：独立ステータス -->
+        <div id="status-window" class="persistent-front-window">
+            <div id="status-window-content"></div>
+        </div>
+
+        <!-- プレイヤーボード -->
         <div id="board-container"></div>
 
         <!-- 下部：ホイール -->
@@ -3435,6 +3646,7 @@
         
 
         wheelContainer.classList.add("window-front");
+        requestAnimationFrame(() => keepWheelInSafeArea());
             }
         }
 
@@ -3447,6 +3659,87 @@
             wheelContainer.style.left = left + "px";
             wheelContainer.style.top = top + "px";
             wheelContainer.style.transform = "none";
+        }
+
+
+        function getWheelBlockerRects() {
+            const margin = 8;
+            return [
+                document.getElementById("map-toolbar-window"),
+                document.getElementById("map-score-window"),
+                document.getElementById("status-window")
+            ].filter(Boolean).map(el => {
+                const r = el.getBoundingClientRect();
+                return {left:r.left-margin, top:r.top-margin, right:r.right+margin, bottom:r.bottom+margin};
+            });
+        }
+
+        function wheelRectAt(left, top) {
+            return {left, top, right:left + wheelContainer.offsetWidth, bottom:top + wheelContainer.offsetHeight};
+        }
+
+        function rectsOverlap(a,b) {
+            return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+        }
+
+        function resolveWheelPosition(left, top) {
+            const margin = 4;
+            const w = wheelContainer.offsetWidth;
+            const h = wheelContainer.offsetHeight;
+            const maxLeft = Math.max(margin, window.innerWidth - w - margin);
+            const maxTop = Math.max(margin, window.innerHeight - h - margin);
+            left = Math.min(Math.max(margin,left),maxLeft);
+            top = Math.min(Math.max(margin,top),maxTop);
+            const blockers=getWheelBlockerRects();
+            if (!blockers.some(b=>rectsOverlap(wheelRectAt(left,top),b))) return {left,top};
+
+            // 候補を「遮蔽物の上下左右」に作り、現在位置から最も近い合法位置へスナップ。
+            const candidates=[{left,top}];
+            for (const b of blockers) {
+                candidates.push(
+                    {left:b.left-w, top}, {left:b.right, top},
+                    {left, top:b.top-h}, {left, top:b.bottom},
+                    {left:b.left-w, top:b.top-h}, {left:b.right, top:b.top-h},
+                    {left:b.left-w, top:b.bottom}, {left:b.right, top:b.bottom}
+                );
+            }
+            const legal=[];
+            for (const c of candidates) {
+                const x=Math.min(Math.max(margin,c.left),maxLeft);
+                const y=Math.min(Math.max(margin,c.top),maxTop);
+                const rr=wheelRectAt(x,y);
+                if (!blockers.some(b=>rectsOverlap(rr,b))) {
+                    const d=(x-left)*(x-left)+(y-top)*(y-top);
+                    legal.push({left:x,top:y,d});
+                }
+            }
+            if (legal.length) {
+                legal.sort((a,b)=>a.d-b.d);
+                return legal[0];
+            }
+            // 画面が狭すぎて合法位置が無い場合は、最も重なり面積が小さい位置を選ぶ。
+            const grid=[];
+            for (let y=margin; y<=maxTop; y+=24) for (let x=margin; x<=maxLeft; x+=24) {
+                const rr=wheelRectAt(x,y); let area=0;
+                for (const b of blockers) {
+                    const iw=Math.max(0,Math.min(rr.right,b.right)-Math.max(rr.left,b.left));
+                    const ih=Math.max(0,Math.min(rr.bottom,b.bottom)-Math.max(rr.top,b.top));
+                    area+=iw*ih;
+                }
+                grid.push({left:x,top:y,area,d:(x-left)*(x-left)+(y-top)*(y-top)});
+            }
+            grid.sort((a,b)=>a.area-b.area || a.d-b.d);
+            return grid[0] || {left,top};
+        }
+
+        function keepWheelInSafeArea() {
+            const r=wheelContainer.getBoundingClientRect();
+            const p=resolveWheelPosition(r.left,r.top);
+            wheelContainer.style.left=`${p.left}px`;
+            wheelContainer.style.top=`${p.top}px`;
+            wheelContainer.style.right="auto";
+            wheelContainer.style.bottom="auto";
+            wheelContainer.style.transform="none";
         }
 
         (function enableWheelResizing() {
@@ -3490,7 +3783,7 @@
                 // 縦横比はホイール自体を常に1:1で固定。
                 wheelSvgEl.style.aspectRatio = "1 / 1";
 
-                keepWheelOnScreen();
+                keepWheelInSafeArea();
             };
 
             wheelResizeHandle.addEventListener("pointerdown", e => {
@@ -3536,6 +3829,14 @@
         })();
 
 
+
+        window.addEventListener("resize", () => {
+            requestAnimationFrame(() => keepWheelInSafeArea());
+        });
+        window.addEventListener("orientationchange", () => {
+            setTimeout(() => keepWheelInSafeArea(), 80);
+        });
+
         (function enableWheelDragging() {
             let dragging = false;
             let offsetX = 0;
@@ -3560,10 +3861,11 @@
                 if (!dragging) return;
                 const maxLeft = Math.max(0, window.innerWidth - wheelContainer.offsetWidth);
                 const maxTop = Math.max(0, window.innerHeight - wheelContainer.offsetHeight);
-                const left = Math.max(0, Math.min(e.clientX - offsetX, maxLeft));
-                const top = Math.max(0, Math.min(e.clientY - offsetY, maxTop));
-                wheelContainer.style.left = left + "px";
-                wheelContainer.style.top = top + "px";
+                const wantedLeft = Math.max(0, Math.min(e.clientX - offsetX, maxLeft));
+                const wantedTop = Math.max(0, Math.min(e.clientY - offsetY, maxTop));
+                const safe = resolveWheelPosition(wantedLeft, wantedTop);
+                wheelContainer.style.left = safe.left + "px";
+                wheelContainer.style.top = safe.top + "px";
             });
 
             const stopDrag = (e) => {
@@ -3574,8 +3876,8 @@
             };
             wheelDragHandle.addEventListener("pointerup", stopDrag);
             wheelDragHandle.addEventListener("pointercancel", stopDrag);
-            window.addEventListener("resize", keepWheelOnScreen);
-            window.addEventListener("orientationchange", () => setTimeout(keepWheelOnScreen, 50));
+            window.addEventListener("resize", keepWheelInSafeArea);
+            window.addEventListener("orientationchange", () => setTimeout(keepWheelInSafeArea, 50));
         })();
 
         wheelContainer.classList.add("window-front");
@@ -4551,7 +4853,7 @@
         statusPanel.innerHTML = `
             <div class="status-item" style="grid-column:1 / -1;"><span class="status-label">騎士団</span><span class="status-value" id="status-knight-order">未選択</span></div>
             <div class="status-item"><span class="status-label">勝利点</span><span class="status-value" id="status-vp">0</span></div>
-            <div class="status-item" id="defeat-status"><span class="status-label">撃破数</span><span class="status-value" id="status-defeated">サラセン人🏹 0 / プロイセン人🛡 0 / スラブ人⚔ 0</span></div>
+            <div class="status-item" id="defeat-status"><span class="status-label">撃破数</span><span class="status-value" id="status-defeated">🏹0　🛡0　⚔0</span></div>
             <div class="status-action-row">
                 <span>移動 <strong id="status-move">0</strong></span>
                 <span>建設 <strong id="status-build">0</strong></span>
@@ -4560,7 +4862,8 @@
                 <span>軍事 <strong id="status-military">0</strong></span>
             </div>
         `;
-        boardContainer.appendChild(statusPanel);
+        const statusWindowContent = document.getElementById("status-window-content");
+        statusWindowContent.appendChild(statusPanel);
 
         function updateStatusUI() {
             const orderEl = document.getElementById("status-knight-order");
@@ -4570,7 +4873,7 @@
             }
             document.getElementById("status-vp").textContent = playerResources.victoryPoints;
             document.getElementById("status-defeated").textContent =
-                `サラセン人🏹 ${playerResources.defeated["サラセン人"]} / プロイセン人🛡 ${playerResources.defeated["プロイセン人"]} / スラブ人⚔ ${playerResources.defeated["スラブ人"]}`;
+                `🏹${playerResources.defeated["サラセン人"]}　🛡${playerResources.defeated["プロイセン人"]}　⚔${playerResources.defeated["スラブ人"]}`;
             document.getElementById("status-move").textContent = playerResources.bonuses.move;
             document.getElementById("status-build").textContent = playerResources.bonuses.build;
             document.getElementById("status-recruit").textContent = playerResources.bonuses.recruit;
