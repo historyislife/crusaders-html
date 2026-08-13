@@ -948,6 +948,107 @@
             max-width: min(260px, 78vw);
         }
 
+
+        /* BOT vs BOT 自動デバッグ */
+        #auto-test-modal {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 90000;
+            background: rgba(2, 6, 23, 0.72);
+            padding: 12px;
+            box-sizing: border-box;
+        }
+
+        #auto-test-modal.active {
+            display: flex;
+        }
+
+        #auto-test-window {
+            width: min(920px, 96vw);
+            max-height: 92vh;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 12px;
+            border: 1px solid #64748b;
+            border-radius: 10px;
+            background: #0f172a;
+            color: #f8fafc;
+            box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+            box-sizing: border-box;
+        }
+
+        #auto-test-title {
+            font-size: 1rem;
+            font-weight: 900;
+            color: #fde047;
+        }
+
+        #auto-test-controls {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+        }
+
+        #auto-test-controls label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.78rem;
+        }
+
+        #auto-test-seed {
+            width: 120px;
+            padding: 5px;
+            border-radius: 5px;
+            border: 1px solid #64748b;
+            background: #020617;
+            color: #f8fafc;
+        }
+
+        #auto-test-controls button {
+            padding: 6px 9px;
+            border: 1px solid #64748b;
+            border-radius: 6px;
+            background: #1e293b;
+            color: #f8fafc;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        #auto-test-controls button:disabled {
+            opacity: .45;
+            cursor: default;
+        }
+
+        #auto-test-progress {
+            font-size: 0.8rem;
+            color: #93c5fd;
+            font-weight: 700;
+        }
+
+        #auto-test-output {
+            flex: 1 1 auto;
+            min-height: 220px;
+            max-height: 62vh;
+            margin: 0;
+            padding: 9px;
+            overflow: auto;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            background: #020617;
+            color: #dbeafe;
+            font-size: 0.72rem;
+            line-height: 1.45;
+            box-sizing: border-box;
+        }
+
     </style>
 </head>
 <body>
@@ -960,6 +1061,7 @@
                 <button id="game-log-btn">GAME LOG</button>
                 <button id="manual-btn">MANUAL</button>
                 <button id="turn-reset-btn" disabled>TURN RESET</button>
+                <button id="auto-test-btn">AUTO TEST</button>
             </div>
             <div id="map-score-window" class="map-hud-window">
                 <span class="map-status-vp">残り勝利点 <span id="map-vp">140</span></span>
@@ -975,6 +1077,20 @@
     </div>
 
     <div id="tooltip"></div>
+
+    <div id="auto-test-modal" role="dialog" aria-modal="true" aria-live="polite">
+        <div id="auto-test-window">
+            <div id="auto-test-title">BOT vs BOT AUTO TEST</div>
+            <div id="auto-test-controls">
+                <label>Base Seed <input id="auto-test-seed" type="number" value="20260813" step="1"></label>
+                <button id="auto-test-run-100">RUN 100</button>
+                <button id="auto-test-replay-fail" disabled>REPLAY LAST FAIL</button>
+                <button id="auto-test-close">閉じる</button>
+            </div>
+            <div id="auto-test-progress">待機中</div>
+            <pre id="auto-test-output">AUTO TESTを実行すると、結果と再現用ログをここに表示します。</pre>
+        </div>
+    </div>
 
     <div id="game-result-modal" role="dialog" aria-modal="true" aria-live="polite">
         <div id="game-result-window">
@@ -1033,6 +1149,14 @@
         const gameLogLines = document.getElementById("game-log-lines");
         const manualBtn = document.getElementById("manual-btn");
         const turnResetBtn = document.getElementById("turn-reset-btn");
+        const autoTestBtn = document.getElementById("auto-test-btn");
+        const autoTestModal = document.getElementById("auto-test-modal");
+        const autoTestSeedInput = document.getElementById("auto-test-seed");
+        const autoTestRun100Btn = document.getElementById("auto-test-run-100");
+        const autoTestReplayFailBtn = document.getElementById("auto-test-replay-fail");
+        const autoTestCloseBtn = document.getElementById("auto-test-close");
+        const autoTestProgressEl = document.getElementById("auto-test-progress");
+        const autoTestOutputEl = document.getElementById("auto-test-output");
         const manualModal = document.getElementById("manual-modal");
         const manualClose = document.getElementById("manual-close");
         const manualContent = document.getElementById("manual-content");
@@ -3098,9 +3222,12 @@
         function completeCurrentTurn(message="") {
             if (gameMode !== "versus" || gameEnded) return;
             snapshotCurrentPlayerState();
+
+            if (autoTestActive && !autoTestRecordTurn(message)) return;
+
             const next=1-currentPlayerIndex;
             loadPlayerState(next);
-            startCurrentPlayerTurn(180);
+            startCurrentPlayerTurn(autoTestActive ? 0 : 180);
         }
 
 
@@ -4472,11 +4599,12 @@
                 setInteractionMode("none");
                 showGameResult(
                     winner,
-                    `<div class="result-score">${a.name}：${a.resources.victoryPoints}点</div>` +
+                    `<div class="result-score">${a.name}（${a.selectedKnightOrder || "騎士団未設定"}）：${a.resources.victoryPoints}点</div>` +
                     `<div class="result-detail">建物終了時 +${a.buildingEndGameBonus||0} ／ 異教徒撃破 +${a.enemyMajorityBonus||0}<br>${a.enemyMajorityDetails?.join(" / ") || ""}</div>` +
-                    `<div class="result-score">${b.name}：${b.resources.victoryPoints}点</div>` +
+                    `<div class="result-score">${b.name}（${b.selectedKnightOrder || "騎士団未設定"}）：${b.resources.victoryPoints}点</div>` +
                     `<div class="result-detail">建物終了時 +${b.buildingEndGameBonus||0} ／ 異教徒撃破 +${b.enemyMajorityBonus||0}<br>${b.enemyMajorityDetails?.join(" / ") || ""}</div>`
                 );
+                if (autoTestActive) autoTestOnGameFinished();
                 return;
             }
 
@@ -4512,8 +4640,8 @@
             messageEl.textContent = "ゲーム終了。結果を表示しています。";
             showGameResult(
                 "ゲーム終了",
-                `<div class="result-score">最終勝利点：${playerResources.victoryPoints}点</div>` +
-                `<div class="result-detail">${endBonus.details.length ? endBonus.details.join("<br>") : "終了時ボーナス：0点"}<br>終了時ボーナス合計：${endBonus.total}点</div>`
+                `<div class="result-score">${selectedKnightOrder || "騎士団未設定"}：${playerResources.victoryPoints}点</div>` +
+                `<div class="result-detail">最終勝利点：${playerResources.victoryPoints}点<br>${endBonus.details.length ? endBonus.details.join("<br>") : "終了時ボーナス：0点"}<br>終了時ボーナス合計：${endBonus.total}点</div>`
             );
         }
 
@@ -4914,6 +5042,554 @@
         // ==========================================
         // 4. BOT NORMAL（既存ゲーム処理を操作するコントローラ）
         // ==========================================
+
+        // ==========================================
+        // BOT vs BOT 自動デバッグ
+        // ==========================================
+        const DEBUG_NATIVE_SET_TIMEOUT = window.setTimeout.bind(window);
+        const DEBUG_ORIGINAL_RANDOM = Math.random.bind(Math);
+
+        let autoTestActive = false;
+        let autoTestFastTimers = false;
+        let autoTestBaseSeed = 20260813;
+        let autoTestCurrentSeed = null;
+        let autoTestSeedState = 1;
+        let autoTestGameSerial = 0;
+        let autoTestTurn = 0;
+        let autoTestExpectedCubeTotals = [0, 0];
+        let autoTestInitialEnemyCounts = {};
+        let autoTestCurrentError = null;
+        let autoTestCurrentResolve = null;
+        let autoTestLastAction = null;
+        let autoTestTurnHistory = [];
+        let autoTestLastFailure = null;
+        let autoTestBatchRunning = false;
+        let autoTestLastProgressAt = 0;
+
+        function autoTestSetSeed(seed) {
+            autoTestCurrentSeed = (Number(seed) >>> 0) || 1;
+            autoTestSeedState = autoTestCurrentSeed;
+            Math.random = () => {
+                // 32bit LCG。seedだけで同じゲームを再現できる。
+                autoTestSeedState = (Math.imul(1664525, autoTestSeedState) + 1013904223) >>> 0;
+                return autoTestSeedState / 4294967296;
+            };
+        }
+
+        function autoTestRestoreRandom() {
+            Math.random = DEBUG_ORIGINAL_RANDOM;
+        }
+
+        function autoTestEnableFastTimers() {
+            if (autoTestFastTimers) return;
+            autoTestFastTimers = true;
+            window.setTimeout = function(fn, delay = 0, ...args) {
+                const d = Number(delay) || 0;
+                // 通常演出・BOT思考待ちは除去。フェイルセーフだけ少し猶予を残す。
+                return DEBUG_NATIVE_SET_TIMEOUT(fn, d >= 1000 ? 100 : 0, ...args);
+            };
+        }
+
+        function autoTestDisableFastTimers() {
+            if (!autoTestFastTimers) return;
+            window.setTimeout = DEBUG_NATIVE_SET_TIMEOUT;
+            autoTestFastTimers = false;
+        }
+
+        function autoTestLogLine(text = "") {
+            if (!autoTestOutputEl) return;
+            autoTestOutputEl.textContent += (autoTestOutputEl.textContent ? "\n" : "") + text;
+            autoTestOutputEl.scrollTop = autoTestOutputEl.scrollHeight;
+        }
+
+        function autoTestSetProgress(text) {
+            if (autoTestProgressEl) autoTestProgressEl.textContent = text;
+        }
+
+        function autoTestOrderSetup(order) {
+            resetGlobalsForPlayerSetup("bot-normal");
+            gameMode = "solo";
+            versusSetupPhase = null;
+            selectedKnightOrder = null;
+            selectKnightOrder(order);
+
+            if (knightOrderSetupMode === "alcantara-token") {
+                const tokenIndex = chooseBotSetupWedge([1,4,0,3,5,2]);
+                handleKnightOrderSetupWedge(tokenIndex);
+                const upgradeIndex = chooseBotSetupWedge([3,0,4,1,5,2].filter(i => i !== tokenIndex));
+                handleKnightOrderSetupWedge(upgradeIndex);
+            } else if (knightOrderSetupMode === "hospital-token") {
+                handleKnightOrderSetupWedge(2);
+            } else if (knightOrderSetupMode === "templar-token") {
+                handleKnightOrderSetupWedge(2);
+                handleKnightOrderSetupWedge(5);
+            } else if (knightOrderSetupMode === "avis-token") {
+                handleKnightOrderSetupWedge(1);
+            } else if (knightOrderSetupMode === "santiago-upgrade") {
+                handleKnightOrderSetupWedge(3);
+            } else if (knightOrderSetupMode === "lazarus-token") {
+                const tokenIndex = chooseBotSetupWedge([2,5,1,4,0,3]);
+                handleKnightOrderSetupWedge(tokenIndex);
+                [3,0,4,1,5,2]
+                    .filter(i => i !== tokenIndex)
+                    .slice(0,3)
+                    .forEach(i => handleKnightOrderSetupWedge(i));
+            }
+
+            isSelectingStart = false;
+            clearSelectableHexes();
+
+            const st = createDefaultPlayerState("bot-normal", "BOT");
+            st.resources = structuredClone(playerResources);
+            st.board = [...board];
+            st.wedgeUpgraded = [...wedgeUpgraded];
+            st.actions = [...actions];
+            st.selectedKnightOrder = selectedKnightOrder;
+            st.knightPositions = {1:null,2:null,3:null,4:null};
+            return st;
+        }
+
+        function autoTestSetupGame(seed) {
+            autoTestSetSeed(seed);
+            hideGameResult();
+            hideChoiceModal();
+
+            // 通常NEW GAMEと同じ共通リセットを利用。
+            gameMode = "solo";
+            playerStates = [];
+            currentPlayerIndex = 0;
+            firstPlayerIndex = 0;
+            versusSetupPhase = null;
+            versusHumanIndex = 0;
+
+            if (inactiveKnightLayer) {
+                inactiveKnightLayer.remove();
+                inactiveKnightLayer = null;
+            }
+
+            resetActionStateForNewGame();
+            resetPlayerBoardForNewGame();
+            resetMapForNewGame();
+            resetWheelForNewGame();
+
+            autoTestInitialEnemyCounts = {
+                "サラセン人": Object.values(hexInfos).filter(x => x.faction === "サラセン人").length,
+                "プロイセン人": Object.values(hexInfos).filter(x => x.faction === "プロイセン人").length,
+                "スラブ人": Object.values(hexInfos).filter(x => x.faction === "スラブ人").length
+            };
+
+            const orderA = knightOrders[Math.floor(Math.random() * knightOrders.length)];
+            const orderB = knightOrders[Math.floor(Math.random() * knightOrders.length)];
+
+            const a = autoTestOrderSetup(orderA);
+            a.name = "BOT A";
+            const b = autoTestOrderSetup(orderB);
+            b.name = "BOT B";
+
+            // 公式の対戦開始順に合わせ、後手が開始マスを選び、先手は残りへ。
+            const starts = [{c:1,r:2},{c:1,r:3}];
+            const secondPos = chooseBotStartPosition();
+            const firstPos = starts.find(p => p.c !== secondPos.c || p.r !== secondPos.r) || starts[0];
+
+            a.knightPositions[1] = {...firstPos};
+            b.knightPositions[1] = {...secondPos};
+            if (a.selectedKnightOrder === "モンテサ騎士団") a.knightPositions[4] = {...firstPos};
+            if (b.selectedKnightOrder === "モンテサ騎士団") b.knightPositions[4] = {...secondPos};
+
+            gameMode = "versus";
+            playerStates = [a, b];
+            currentPlayerIndex = 0;
+            firstPlayerIndex = 0;
+            versusSetupPhase = null;
+            remainingVictoryPoints = 140;
+            gameEnded = false;
+            gameEndScheduled = false;
+            globalDefeated = {"サラセン人":0,"プロイセン人":0,"スラブ人":0};
+
+            autoTestExpectedCubeTotals = [
+                a.board.reduce((x,y) => x+y, 0),
+                b.board.reduce((x,y) => x+y, 0)
+            ];
+            autoTestTurn = 0;
+            autoTestLastProgressAt = performance.now();
+            autoTestCurrentError = null;
+            autoTestLastAction = null;
+            autoTestTurnHistory = [];
+
+            loadPlayerState(0);
+        }
+
+        function autoTestValidateState(context = "TURN END") {
+            const errors = [];
+            const finiteNonNegative = (v) => Number.isFinite(v) && v >= 0;
+
+            if (!Number.isFinite(remainingVictoryPoints) || remainingVictoryPoints < 0 || remainingVictoryPoints > 140) {
+                errors.push(`残り勝利点が不正: ${remainingVictoryPoints}`);
+            }
+
+            if (!Array.isArray(playerStates) || playerStates.length !== 2) {
+                errors.push(`playerStates数が不正: ${playerStates?.length}`);
+                return errors;
+            }
+
+            playerStates.forEach((st, pi) => {
+                if (!st) {
+                    errors.push(`P${pi+1}: stateなし`);
+                    return;
+                }
+                if (!knightOrders.includes(st.selectedKnightOrder)) {
+                    errors.push(`P${pi+1}: 騎士団不正 ${st.selectedKnightOrder}`);
+                }
+                if (!Array.isArray(st.board) || st.board.length !== NUM_WEDGES) {
+                    errors.push(`P${pi+1}: board形式不正`);
+                } else {
+                    st.board.forEach((v, i) => {
+                        if (!Number.isInteger(v) || v < 0) errors.push(`P${pi+1}: wedge${i} コマ数不正 ${v}`);
+                    });
+                    const total = st.board.reduce((a,b) => a+b, 0);
+                    if (total !== autoTestExpectedCubeTotals[pi]) {
+                        errors.push(`P${pi+1}: アクションコマ総数 ${total}（期待 ${autoTestExpectedCubeTotals[pi]}）`);
+                    }
+                }
+
+                const r = st.resources;
+                if (!r || !finiteNonNegative(r.victoryPoints)) {
+                    errors.push(`P${pi+1}: VP不正 ${r?.victoryPoints}`);
+                }
+                ["move","build","recruit","influence","military"].forEach(k => {
+                    if (!finiteNonNegative(r?.bonuses?.[k])) errors.push(`P${pi+1}: bonus.${k}不正 ${r?.bonuses?.[k]}`);
+                });
+                ["軍隊","城","教会","農場","銀行"].forEach(name => {
+                    const v = r?.buildingsBuilt?.[name];
+                    const maxTiles = name === "軍隊" ? 5 : 4;
+                    if (!Number.isInteger(v) || v < 0 || v > maxTiles) {
+                        errors.push(`P${pi+1}: ${name}枚数不正 ${v}（上限${maxTiles}）`);
+                    }
+                });
+                ["サラセン人","プロイセン人","スラブ人"].forEach(name => {
+                    const v = r?.defeated?.[name];
+                    if (!Number.isInteger(v) || v < 0) errors.push(`P${pi+1}: ${name}撃破数不正 ${v}`);
+                });
+                Object.entries(st.knightPositions || {}).forEach(([num,pos]) => {
+                    if (!pos) return;
+                    const key = `${pos.c},${pos.r}`;
+                    if (!hexGroups[key]) errors.push(`P${pi+1}: 騎士${num}が盤外 ${key}`);
+                });
+            });
+
+            ["サラセン人","プロイセン人","スラブ人"].forEach(name => {
+                const defeatedSum = playerStates.reduce((sum, st) => sum + (st?.resources?.defeated?.[name] || 0), 0);
+                const global = globalDefeated?.[name] || 0;
+                if (global !== defeatedSum) {
+                    errors.push(`${name}: globalDefeated ${global} != 両者撃破合計 ${defeatedSum}`);
+                }
+                const onMap = Object.values(hexInfos).filter(x => x.faction === name).length;
+                const expectedOnMap = (autoTestInitialEnemyCounts[name] || 0) - global;
+                if (onMap !== expectedOnMap) {
+                    errors.push(`${name}: 盤上 ${onMap} != 期待 ${expectedOnMap}`);
+                }
+            });
+
+            ["城","教会","農場","銀行"].forEach(name => {
+                const mapCount = Object.values(hexBuildings).filter(v => v === name).length;
+                const builtCount = playerStates.reduce((sum, st) => sum + (st?.resources?.buildingsBuilt?.[name] || 0), 0);
+                if (mapCount !== builtCount) {
+                    errors.push(`${name}: 盤上建物 ${mapCount} != 両者建設数 ${builtCount}`);
+                }
+            });
+
+            if (context === "TURN END") {
+                if (isDistributingTokens) errors.push("手番終了時に分配処理が残存");
+                if (isSelectingMove || isSelectingBuild || isSelectingCrusade || isSelectingRecruit) {
+                    errors.push("手番終了時に対象選択フラグが残存");
+                }
+                if (enhancementAwaitingSource || enhancementInfoPending || isEnhancingWedge) {
+                    errors.push("手番終了時にウェッジ強化待ちが残存");
+                }
+            }
+
+            return errors;
+        }
+
+        function autoTestActionSummary(action) {
+            if (!action) return "不明";
+            const type = action.type || "?";
+            const label = action.label || action.allocationLabel || "";
+            const wedge = Number.isInteger(action.wedgeIndex) ? ` wedge=${action.wedgeIndex}` : "";
+            return `${type}${wedge}${label ? ` ${label}` : ""}`;
+        }
+
+        function autoTestRecordTurn(message = "") {
+            if (!autoTestActive) return true;
+            autoTestTurn++;
+            autoTestLastProgressAt = performance.now();
+
+            const current = playerStates[currentPlayerIndex];
+            autoTestTurnHistory.push(
+                `T${autoTestTurn} ${current?.name || `P${currentPlayerIndex+1}`} ` +
+                `[${current?.selectedKnightOrder || "?"}] ${autoTestActionSummary(autoTestLastAction)} ` +
+                `VP=${current?.resources?.victoryPoints ?? "?"} Pool=${remainingVictoryPoints}` +
+                (message ? ` | ${String(message).replace(/\s+/g," ").slice(0,140)}` : "")
+            );
+            if (autoTestTurnHistory.length > 30) autoTestTurnHistory.shift();
+
+            if (autoTestTurn > 500) {
+                autoTestFail(`500手を超えてもゲームが終了しません`);
+                return false;
+            }
+
+            const errors = autoTestValidateState("TURN END");
+            if (errors.length) {
+                autoTestFail(errors.join(" / "));
+                return false;
+            }
+            return true;
+        }
+
+        function autoTestFail(reason) {
+            if (!autoTestActive || autoTestCurrentError) return;
+            autoTestCurrentError = {
+                seed: autoTestCurrentSeed,
+                turn: autoTestTurn,
+                reason,
+                lastAction: autoTestActionSummary(autoTestLastAction),
+                history: [...autoTestTurnHistory],
+                currentPlayerIndex,
+                remainingVictoryPoints
+            };
+            gameEnded = true;
+            gameEndScheduled = false;
+            if (botTurnTimer) clearTimeout(botTurnTimer);
+            if (botFailsafeTimer) clearTimeout(botFailsafeTimer);
+            botTurnTimer = null;
+            botFailsafeTimer = null;
+            botIsExecutingTurn = false;
+            hideChoiceModal();
+            autoTestResolveGame("FAIL");
+        }
+
+        function autoTestResolveGame(status) {
+            if (!autoTestCurrentResolve) return;
+            const resolve = autoTestCurrentResolve;
+            autoTestCurrentResolve = null;
+            resolve({
+                status,
+                error: autoTestCurrentError,
+                seed: autoTestCurrentSeed,
+                turns: autoTestTurn,
+                players: playerStates.map(st => ({
+                    name: st.name,
+                    order: st.selectedKnightOrder,
+                    vp: st.resources?.victoryPoints ?? 0
+                }))
+            });
+        }
+
+        function autoTestOnGameFinished() {
+            if (!autoTestActive) return;
+            const errors = autoTestValidateState("GAME END");
+            if (errors.length) {
+                autoTestFail(`GAME END: ${errors.join(" / ")}`);
+                return;
+            }
+            autoTestResolveGame("PASS");
+        }
+
+        function autoTestFormatFailure(fail, gameNo) {
+            if (!fail) return "";
+            return [
+                `--- FAIL GAME ${gameNo} ---`,
+                `seed=${fail.seed}`,
+                `turn=${fail.turn}`,
+                `reason=${fail.reason}`,
+                `lastAction=${fail.lastAction}`,
+                `currentPlayerIndex=${fail.currentPlayerIndex}`,
+                `remainingVictoryPoints=${fail.remainingVictoryPoints}`,
+                `直前履歴:`,
+                ...(fail.history || []).map(x => `  ${x}`)
+            ].join("\n");
+        }
+
+        async function autoTestRunSingle(seed, gameNo, total) {
+            autoTestGameSerial++;
+            const serial = autoTestGameSerial;
+            autoTestSetupGame(seed);
+
+            const setupErrors = autoTestValidateState("SETUP");
+            if (setupErrors.length) {
+                autoTestFail(`SETUP: ${setupErrors.join(" / ")}`);
+                return {
+                    status:"FAIL",
+                    error:autoTestCurrentError,
+                    seed,
+                    turns:0,
+                    players:playerStates.map(st=>({name:st.name,order:st.selectedKnightOrder,vp:0}))
+                };
+            }
+
+            autoTestSetProgress(`実行中 ${gameNo}/${total}  seed=${seed}  ${playerStates[0].selectedKnightOrder} vs ${playerStates[1].selectedKnightOrder}`);
+
+            return await new Promise(resolve => {
+                autoTestCurrentResolve = resolve;
+
+                // 最後に手番が進んでから5秒以上変化がない場合だけ停止判定する。
+                const watchdog = () => {
+                    if (!autoTestActive || !autoTestCurrentResolve || autoTestGameSerial !== serial) return;
+                    const idleMs = performance.now() - autoTestLastProgressAt;
+                    if (idleMs >= 5000) {
+                        autoTestFail(`進行停止ウォッチドッグ：${Math.round(idleMs)}ms 手番進行なし`);
+                        return;
+                    }
+                    DEBUG_NATIVE_SET_TIMEOUT(watchdog, Math.max(250, 5000 - idleMs));
+                };
+                DEBUG_NATIVE_SET_TIMEOUT(watchdog, 5000);
+
+                loadPlayerState(0);
+                startCurrentPlayerTurn(0);
+            });
+        }
+
+        async function runAutoTestBatch(count = 100, forcedSeed = null) {
+            if (autoTestBatchRunning) return;
+            autoTestBatchRunning = true;
+            autoTestActive = true;
+            autoTestEnableFastTimers();
+
+            const baseSeed = forcedSeed == null
+                ? ((Number(autoTestSeedInput?.value) || Date.now()) >>> 0)
+                : (Number(forcedSeed) >>> 0);
+            autoTestBaseSeed = baseSeed;
+
+            if (autoTestRun100Btn) autoTestRun100Btn.disabled = true;
+            if (autoTestCloseBtn) autoTestCloseBtn.disabled = true;
+            if (autoTestReplayFailBtn) autoTestReplayFailBtn.disabled = true;
+            if (autoTestOutputEl) autoTestOutputEl.textContent = "";
+
+            let pass = 0;
+            let fail = 0;
+            const failures = [];
+            const orderStats = {};
+
+            autoTestLogLine(`BOT vs BOT AUTO TEST`);
+            autoTestLogLine(`games=${count} baseSeed=${baseSeed}`);
+            autoTestLogLine(`各ゲームseed = baseSeed + gameIndex`);
+            autoTestLogLine("");
+
+            try {
+                for (let i = 0; i < count; i++) {
+                    const seed = (baseSeed + i) >>> 0;
+                    const result = await autoTestRunSingle(seed, i + 1, count);
+
+                    result.players.forEach(p => {
+                        if (!orderStats[p.order]) orderStats[p.order] = {games:0,wins:0,totalVp:0};
+                        orderStats[p.order].games++;
+                        orderStats[p.order].totalVp += p.vp || 0;
+                    });
+
+                    if (result.status === "PASS") {
+                        pass++;
+                        const [a,b] = result.players;
+                        if (a.vp !== b.vp) {
+                            const winner = a.vp > b.vp ? a : b;
+                            orderStats[winner.order].wins++;
+                        }
+                    } else {
+                        fail++;
+                        failures.push(result.error);
+                        if (!autoTestLastFailure) autoTestLastFailure = result.error;
+                        autoTestLogLine(autoTestFormatFailure(result.error, i + 1));
+                        autoTestLogLine("");
+                    }
+
+                    autoTestSetProgress(`完了 ${i+1}/${count}　PASS ${pass} / FAIL ${fail}`);
+                    hideGameResult();
+
+                    // UIを時々描画させる。
+                    if ((i + 1) % 5 === 0) {
+                        await new Promise(r => DEBUG_NATIVE_SET_TIMEOUT(r, 0));
+                    }
+                }
+
+                autoTestLogLine(`=== SUMMARY ===`);
+                autoTestLogLine(`PASS=${pass} FAIL=${fail} TOTAL=${count}`);
+                autoTestLogLine(`baseSeed=${baseSeed}`);
+                autoTestLogLine("");
+                autoTestLogLine(`騎士団別（出場 / 勝利 / 平均VP）`);
+                Object.entries(orderStats)
+                    .sort((a,b) => a[0].localeCompare(b[0], "ja"))
+                    .forEach(([name, st]) => {
+                        const avg = st.games ? (st.totalVp / st.games).toFixed(1) : "0.0";
+                        autoTestLogLine(`${name}: ${st.games} / ${st.wins} / ${avg}`);
+                    });
+
+                if (failures.length) {
+                    autoTestLastFailure = failures[0];
+                    autoTestLogLine("");
+                    autoTestLogLine(`最初のFAILは seed=${autoTestLastFailure.seed} で再現できます。`);
+                    if (autoTestReplayFailBtn) autoTestReplayFailBtn.disabled = false;
+                } else {
+                    autoTestLastFailure = null;
+                }
+
+                autoTestSetProgress(`終了　PASS ${pass} / FAIL ${fail} / TOTAL ${count}`);
+            } catch (err) {
+                autoTestLogLine("");
+                autoTestLogLine(`HARNESS ERROR: ${err?.stack || err}`);
+                autoTestSetProgress("AUTO TEST自体でエラーが発生しました");
+            } finally {
+                autoTestCurrentResolve = null;
+                autoTestActive = false;
+                autoTestDisableFastTimers();
+                autoTestRestoreRandom();
+                autoTestBatchRunning = false;
+                if (autoTestRun100Btn) autoTestRun100Btn.disabled = false;
+                if (autoTestCloseBtn) autoTestCloseBtn.disabled = false;
+                if (autoTestReplayFailBtn) autoTestReplayFailBtn.disabled = !autoTestLastFailure;
+
+                // 通常プレイへ戻す。
+                try {
+                    resetGameInPlace();
+                    hideChoiceModal();
+                    messageEl.textContent = "AUTO TESTが終了しました。NEW GAMEから通常プレイを開始できます。";
+                } catch (_) {}
+            }
+        }
+
+        autoTestBtn?.addEventListener("click", () => {
+            const password = window.prompt("AUTO TEST パスワードを入力してください。");
+            if (password === null) return;
+            if (password !== "1023") {
+                window.alert("パスワードが違います。");
+                return;
+            }
+            autoTestModal?.classList.add("active");
+        });
+
+        autoTestCloseBtn?.addEventListener("click", () => {
+            if (!autoTestBatchRunning) autoTestModal?.classList.remove("active");
+        });
+
+        autoTestModal?.addEventListener("click", e => {
+            if (e.target === autoTestModal && !autoTestBatchRunning) autoTestModal.classList.remove("active");
+        });
+
+        autoTestRun100Btn?.addEventListener("click", () => runAutoTestBatch(100));
+
+        autoTestReplayFailBtn?.addEventListener("click", () => {
+            if (!autoTestLastFailure || autoTestBatchRunning) return;
+            const seed = autoTestLastFailure.seed;
+            if (autoTestSeedInput) autoTestSeedInput.value = seed;
+            runAutoTestBatch(1, seed);
+        });
+
+        window.addEventListener("error", e => {
+            if (autoTestActive) autoTestFail(`JavaScript error: ${e.message}`);
+        });
+
+        window.addEventListener("unhandledrejection", e => {
+            if (autoTestActive) autoTestFail(`Unhandled promise rejection: ${e.reason}`);
+        });
+
         const BOT_DEBUG = false;
         const BOT_INFLUENCE_POINT_WEIGHT = 4.5; // 影響アクションの即時得点評価（低め）
         const BOT_THINK_DELAY = 220;
@@ -5102,6 +5778,15 @@
         function executeAction(action) {
             if (!action || gameEnded) return false;
             if (action.controller === "bot") {
+                if (autoTestActive) {
+                    autoTestLastAction = {
+                        type: action.type,
+                        wedgeIndex: action.wedgeIndex,
+                        label: action.label,
+                        allocationLabel: action.allocationLabel,
+                        distributionSourceIndex: action.distributionSourceIndex
+                    };
+                }
                 botCurrentPlan = action;
                 botIsExecutingTurn = true;
                 botFlexibleCursor = 0;
@@ -5196,6 +5881,7 @@
                 botLog("安全上限300手に到達。BOTを停止しました。");
                 messageEl.style.color = "#f87171";
                 messageEl.textContent = "BOTは300手の安全上限に到達したため停止しました。";
+                if (autoTestActive) autoTestFail("BOT安全上限300手に到達");
                 return;
             }
 
@@ -5206,6 +5892,7 @@
                 botLog("合法手がありません。BOTを停止しました。");
                 messageEl.style.color = "#f87171";
                 messageEl.textContent = "BOT：合法手がありません。";
+                if (autoTestActive) autoTestFail("BOT合法手なし");
                 return;
             }
             const evaluated = moves.map(move => ({...move, score: evaluateMove(move)}));
