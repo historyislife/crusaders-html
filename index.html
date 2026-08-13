@@ -959,6 +959,7 @@
                 <button id="new-game-btn">NEW GAME</button>
                 <button id="game-log-btn">GAME LOG</button>
                 <button id="manual-btn">MANUAL</button>
+                <button id="turn-reset-btn" disabled>TURN RESET</button>
             </div>
             <div id="map-score-window" class="map-hud-window">
                 <span class="map-status-vp">残り勝利点 <span id="map-vp">140</span></span>
@@ -1031,6 +1032,7 @@
         const gameLogClose = document.getElementById("game-log-close");
         const gameLogLines = document.getElementById("game-log-lines");
         const manualBtn = document.getElementById("manual-btn");
+        const turnResetBtn = document.getElementById("turn-reset-btn");
         const manualModal = document.getElementById("manual-modal");
         const manualClose = document.getElementById("manual-close");
         const manualContent = document.getElementById("manual-content");
@@ -2166,6 +2168,8 @@
         }
 
         function startNewGameSelection() {
+            humanTurnStartSnapshot = null;
+            if (turnResetBtn) turnResetBtn.disabled = true;
             startControllerSelection();
         }
 
@@ -2783,11 +2787,218 @@
             playerStates[index].knightPositions={1:null,2:null,3:null,4:null};
         }
 
+
+        let humanTurnStartSnapshot = null;
+
+        function captureMapStateForTurnReset() {
+            const info = {};
+            Object.entries(hexInfos).forEach(([key, value]) => {
+                info[key] = structuredClone(value);
+            });
+            return info;
+        }
+
+        function captureHumanTurnStartSnapshot() {
+            if (gameMode !== "versus" || gameEnded) {
+                humanTurnStartSnapshot = null;
+                if (turnResetBtn) turnResetBtn.disabled = true;
+                return;
+            }
+            const st = playerStates[currentPlayerIndex];
+            if (!st || st.controller !== "human") {
+                humanTurnStartSnapshot = null;
+                if (turnResetBtn) turnResetBtn.disabled = true;
+                return;
+            }
+
+            // 念のため現在の人間側グローバル状態をplayerStatesへ同期してから保存。
+            snapshotCurrentPlayerState();
+
+            humanTurnStartSnapshot = {
+                currentPlayerIndex,
+                playerStates: structuredClone(playerStates),
+                remainingVictoryPoints,
+                globalDefeated: structuredClone(globalDefeated),
+                hexBuildings: structuredClone(hexBuildings),
+                hexInfos: captureMapStateForTurnReset(),
+                gameEnded,
+                gameEndScheduled
+            };
+
+            if (turnResetBtn) turnResetBtn.disabled = false;
+        }
+
+        function clearTransientActionStateForTurnReset() {
+            if (botTurnTimer) clearTimeout(botTurnTimer);
+            botTurnTimer = null;
+            if (botFailsafeTimer) clearTimeout(botFailsafeTimer);
+            botFailsafeTimer = null;
+            botIsExecutingTurn = false;
+            botCurrentPlan = null;
+            botFlexibleCursor = 0;
+            botActiveSubActionDetail = null;
+
+            isAnimating = false;
+            isDistributingTokens = false;
+            distributingSourceIndex = null;
+            distributingActionTokens = 0;
+            tokensToDistribute = 0;
+            distributionNextIndex = null;
+            distributionDirection = 1;
+            distributionSpecialUsed = false;
+            distributionSourceStartChoicePending = false;
+            templarRepeatIndex = null;
+            distributionTransactionSnapshot = null;
+            distributionOriginalBoard = null;
+            distributionSkipsAction = false;
+
+            pendingWedgeChoiceIndex = null;
+            isEnhancingWedge = false;
+            enhancingWedgeIndex = null;
+            enhancementAwaitingSource = false;
+            enhancementInfoPending = false;
+
+            pendingCombinedActions = [];
+            pendingCombinedTokens = 0;
+            flexibleCombinedMode = false;
+            flexibleCombinedActions = [];
+            flexibleBasePoints = 0;
+            currentFlexibleAction = null;
+
+            isSelectingMove = false;
+            selectedMoveKnight = null;
+            isSelectingBuild = false;
+            selectedBuildKnight = null;
+            isSelectingCrusade = false;
+            isSelectingRecruit = false;
+
+            buildUsedThisTurn = false;
+            crusadeUsedThisTurn = false;
+
+            clearSelectableHexes();
+            clearBuildableHighlights();
+            clearRecruitableHighlights();
+            clearKnightActionHighlights();
+            clearDistributionHighlights();
+            hideChoiceModal();
+        }
+
+        function redrawMapFromTurnResetSnapshot() {
+            // 敵・建物表示だけを再構築。六角形・ボーナス帯は既存DOMを利用する。
+            Object.entries(hexGroups).forEach(([key, group]) => {
+                group.querySelectorAll(".enemy-token, .enemy-label, .map-building-label, .building-label").forEach(el => el.remove());
+
+                const info = hexInfos[key];
+                if (!info) return;
+                const [col, row] = key.split(",").map(Number);
+                const cx = col * X_OFFSET;
+                let cy = row * Y_OFFSET;
+                if (col % 2 !== 0) cy += Y_OFFSET / 2;
+
+                if (["サラセン人", "プロイセン人", "スラブ人"].includes(info.faction)) {
+                    const circle = document.createElementNS(SVG_NS, "circle");
+                    circle.setAttribute("cx", cx);
+                    circle.setAttribute("cy", cy);
+                    circle.setAttribute("r", 13);
+                    circle.style.pointerEvents = "none";
+                    circle.classList.add("enemy-token");
+
+                    const text = document.createElementNS(SVG_NS, "text");
+                    text.setAttribute("x", cx);
+                    text.setAttribute("y", cy + 4);
+                    text.setAttribute("font-size", "17px");
+                    text.setAttribute("font-weight", "bold");
+                    text.setAttribute("text-anchor", "middle");
+                    text.style.pointerEvents = "none";
+                    text.classList.add("enemy-label");
+
+                    if (info.faction === "サラセン人") {
+                        circle.setAttribute("fill", "#eab308");
+                        text.setAttribute("fill", "#000");
+                        text.textContent = "🏹";
+                    } else if (info.faction === "プロイセン人") {
+                        circle.setAttribute("fill", "#3b82f6");
+                        text.setAttribute("fill", "#fff");
+                        text.textContent = "🛡";
+                    } else {
+                        circle.setAttribute("fill", "#ef4444");
+                        text.setAttribute("fill", "#fff");
+                        text.textContent = "⚔";
+                    }
+                    group.appendChild(circle);
+                    group.appendChild(text);
+                }
+
+                if (info.building && info.building !== "空白") {
+                    const bText = document.createElementNS(SVG_NS, "text");
+                    bText.setAttribute("x", cx);
+                    bText.setAttribute("y", cy + 12);
+                    bText.setAttribute("font-size", "36px");
+                    bText.setAttribute("font-weight", "bold");
+                    bText.setAttribute("fill", info.affiliation === "ボット" ? "#ffffff" : "#000000");
+                    bText.setAttribute("text-anchor", "middle");
+                    bText.style.pointerEvents = "none";
+                    bText.classList.add("map-building-label");
+                    bText.textContent = getMapBuildingSymbol(info.building);
+                    group.appendChild(bText);
+                }
+
+                updateHexAffiliationVisual(key);
+            });
+        }
+
+        function restoreHumanTurnStart() {
+            if (
+                !humanTurnStartSnapshot
+                || gameMode !== "versus"
+                || gameEnded
+                || playerController !== "human"
+                || currentPlayerIndex !== humanTurnStartSnapshot.currentPlayerIndex
+            ) {
+                messageEl.style.color = "#f87171";
+                messageEl.textContent = "現在は人間手番のやり直しを実行できません。";
+                return;
+            }
+
+            clearTransientActionStateForTurnReset();
+
+            const snap = structuredClone(humanTurnStartSnapshot);
+            playerStates = snap.playerStates;
+            currentPlayerIndex = snap.currentPlayerIndex;
+            remainingVictoryPoints = snap.remainingVictoryPoints;
+            globalDefeated = snap.globalDefeated;
+            hexBuildings = snap.hexBuildings;
+            gameEnded = snap.gameEnded;
+            gameEndScheduled = snap.gameEndScheduled;
+
+            Object.keys(hexInfos).forEach(key => {
+                if (snap.hexInfos[key]) {
+                    Object.assign(hexInfos[key], structuredClone(snap.hexInfos[key]));
+                }
+            });
+
+            redrawMapFromTurnResetSnapshot();
+            loadPlayerState(currentPlayerIndex);
+
+            setInteractionMode("all");
+            messageEl.style.color = "#4ade80";
+            messageEl.textContent = "人間の手番開始時点まで戻しました。手番を最初からやり直してください。";
+            appendGameLog("人間手番を開始時点まで戻しました。");
+
+            // 同じ開始状態をもう一度基準にして、再度やり直せるよう保持。
+            humanTurnStartSnapshot = snap;
+            if (turnResetBtn) turnResetBtn.disabled = false;
+        }
+
+        turnResetBtn?.addEventListener("click", restoreHumanTurnStart);
+
         function startCurrentPlayerTurn(delay = 180) {
             if (gameMode !== "versus" || gameEnded || !playerStates[currentPlayerIndex]) return;
 
             const st = playerStates[currentPlayerIndex];
             if (st.controller === "bot-normal") {
+                humanTurnStartSnapshot = null;
+                if (turnResetBtn) turnResetBtn.disabled = true;
                 setInteractionMode("none");
                 messageEl.style.color = "#93c5fd";
                 messageEl.textContent = "BOT思考中…";
@@ -2810,6 +3021,7 @@
                 }, Math.max(700, delay + 400));
             } else {
                 setInteractionMode("all");
+                captureHumanTurnStartSnapshot();
                 messageEl.style.color = "#4ade80";
                 messageEl.textContent = `${st.name}の手番です。`;
             }
@@ -4009,7 +4221,7 @@
             "城": [
                 "2個目の騎士コマを城と同じマスに置く\n移動力ボーナス+1",
                 "移動力ボーナス+1",
-                "3個目の騎士コマを城と同じマスに置く\n移動力ボーナス+1",
+                "3個目の騎士コマを城と同じマスに置く\n軍事力ボーナス+1",
                 "ゲーム終了時：異教徒コマ3種1セットごとに4勝利点"
             ],
             "教会": [
@@ -4290,8 +4502,8 @@
                     bonusMessage = "移動力+1";
                 } else if (builtLevel === 3) {
                     placeExtraKnightToken(c, r, 3);
-                    playerResources.bonuses.move += 1;
-                    bonusMessage = "3個目の騎士コマを配置、移動力+1";
+                    playerResources.bonuses.military += 1;
+                    bonusMessage = "3個目の騎士コマを配置、軍事力+1";
                 } else if (builtLevel === 4) {
                     playerResources.endGameBonuses.castleEnemySet = true;
                     bonusMessage = "ゲーム終了時、異教徒コマ3種1セットごとに4勝利点";
@@ -4592,8 +4804,8 @@
                             bonusMessage = " 移動力+1。";
                         } else if (builtLevel === 3) {
                             placeExtraKnightToken(playerPosition.c, playerPosition.r, 3);
-                            playerResources.bonuses.move += 1;
-                            bonusMessage = " 3個目の騎士コマを配置、移動力+1。";
+                            playerResources.bonuses.military += 1;
+                            bonusMessage = " 3個目の騎士コマを配置、軍事力+1。";
                         } else if (builtLevel === 4) {
                             playerResources.endGameBonuses.castleEnemySet = true;
                             bonusMessage = " ゲーム終了時、異教徒コマ3種1セットごとに4勝利点。";
