@@ -1288,6 +1288,196 @@
             -webkit-user-select: none;
         }
 
+
+        /* =========================================================
+           前面階層の最終定義
+           HUD/STATUS > 選択中のMAP/BOARD > ACTION WHEEL > 通常盤面
+           ========================================================= */
+        #map-section,
+        #board-container {
+            z-index: 100 !important;
+        }
+
+        #wheel-container {
+            z-index: 2000 !important;
+        }
+
+        #map-section.window-front,
+        #board-container.window-front {
+            z-index: 3000 !important;
+        }
+
+        /* 選択中にホイールが上へ出ないよう、window-front指定が残っても
+           MAP/BOARD選択モードではJS側でクラスを外す。通常時のみ使用。 */
+        #wheel-container.window-front {
+            z-index: 2000 !important;
+        }
+
+        #map-hud-area {
+            z-index: 5000 !important;
+        }
+
+        #map-toolbar-window,
+        #map-score-window {
+            z-index: 5010 !important;
+        }
+
+        #status-window {
+            z-index: 5020 !important;
+        }
+
+        /* タブレット等で 100dvh + padding が画面高を超えないようにする */
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            max-height: 100%;
+            box-sizing: border-box;
+        }
+
+        body {
+            height: 100dvh;
+            max-height: 100dvh;
+            box-sizing: border-box;
+        }
+
+        #left-section,
+        #ui-section {
+            min-height: 0;
+            max-height: 100%;
+            box-sizing: border-box;
+        }
+
+        #message {
+            flex: 0 0 auto !important;
+            flex-shrink: 0 !important;
+            box-sizing: border-box;
+        }
+
+        /* タブレット横画面：下部メッセージ欄の実表示高を確保 */
+        @media (orientation: landscape) and (min-width: 761px) and (max-width: 1366px) {
+            body {
+                height: 100dvh;
+                max-height: 100dvh;
+                padding-top: 5px;
+                padding-bottom: 5px;
+            }
+
+            #left-section {
+                height: 100%;
+                min-height: 0;
+            }
+
+            #map-section {
+                min-height: 0;
+                flex: 1 1 0;
+            }
+
+            #message {
+                min-height: 34px;
+                max-height: 72px;
+                padding: 5px 9px;
+                overflow-y: auto;
+                font-size: 0.74rem;
+            }
+        }
+
+
+        #choice-modal-message {
+            width: min(100%, 420px);
+            box-sizing: border-box;
+            padding: 7px 10px;
+            margin: 0 0 4px 0;
+            border-bottom: 1px solid #475569;
+            color: #facc15;
+            font-size: 0.78rem;
+            font-weight: 700;
+            line-height: 1.35;
+            text-align: center;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+
+        @media (max-width: 760px) {
+            #choice-modal-message {
+                padding: 5px 7px;
+                font-size: 0.68rem;
+                line-height: 1.3;
+            }
+        }
+
+
+        #auto-test-unlock-modal {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 91000;
+            padding: 12px;
+            box-sizing: border-box;
+            background: rgba(2, 6, 23, 0.76);
+        }
+
+        #auto-test-unlock-modal.active {
+            display: flex;
+        }
+
+        #auto-test-unlock-window {
+            width: min(320px, calc(100vw - 24px));
+            padding: 14px;
+            box-sizing: border-box;
+            border: 1px solid #64748b;
+            border-radius: 10px;
+            background: #0f172a;
+            color: #f8fafc;
+            box-shadow: 0 16px 48px rgba(0,0,0,.65);
+            text-align: center;
+        }
+
+        .auto-test-unlock-title {
+            margin-bottom: 7px;
+            color: #fde047;
+            font-weight: 900;
+        }
+
+        .auto-test-unlock-message {
+            margin-bottom: 8px;
+            font-size: .78rem;
+            color: #cbd5e1;
+        }
+
+        #auto-test-password {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            border: 1px solid #64748b;
+            border-radius: 6px;
+            background: #020617;
+            color: #f8fafc;
+            text-align: center;
+            font-size: 1rem;
+        }
+
+        #auto-test-password-error {
+            min-height: 1.2em;
+            margin-top: 5px;
+            color: #f87171;
+            font-size: .72rem;
+        }
+
+        .auto-test-unlock-actions {
+            display: flex;
+            justify-content: center;
+            gap: 7px;
+            margin-top: 7px;
+        }
+
+        .auto-test-unlock-actions button {
+            padding: 6px 12px;
+            cursor: pointer;
+        }
+
     </style>
 </head>
 <body>
@@ -1316,6 +1506,19 @@
     </div>
 
     <div id="tooltip"></div>
+
+    <div id="auto-test-unlock-modal" role="dialog" aria-modal="true" aria-live="polite">
+        <div id="auto-test-unlock-window">
+            <div class="auto-test-unlock-title">AUTO TEST</div>
+            <div class="auto-test-unlock-message">パスワードを入力してください。</div>
+            <input id="auto-test-password" type="password" inputmode="numeric" autocomplete="off" maxlength="12">
+            <div id="auto-test-password-error"></div>
+            <div class="auto-test-unlock-actions">
+                <button id="auto-test-unlock-submit">開く</button>
+                <button id="auto-test-unlock-cancel">キャンセル</button>
+            </div>
+        </div>
+    </div>
 
     <div id="auto-test-modal" role="dialog" aria-modal="true" aria-live="polite">
         <div id="auto-test-window">
@@ -1395,6 +1598,11 @@
         const manualBtn = document.getElementById("manual-btn");
         const turnResetBtn = document.getElementById("turn-reset-btn");
         const autoTestBtn = document.getElementById("auto-test-btn");
+        const autoTestUnlockModal = document.getElementById("auto-test-unlock-modal");
+        const autoTestPasswordInput = document.getElementById("auto-test-password");
+        const autoTestPasswordError = document.getElementById("auto-test-password-error");
+        const autoTestUnlockSubmit = document.getElementById("auto-test-unlock-submit");
+        const autoTestUnlockCancel = document.getElementById("auto-test-unlock-cancel");
         const autoTestModal = document.getElementById("auto-test-modal");
         const autoTestSeedInput = document.getElementById("auto-test-seed");
         const autoTestRun100Btn = document.getElementById("auto-test-run-100");
@@ -1417,6 +1625,19 @@
 
         function getChoiceMessageState() {
             return (messageEl?.textContent || "").replace(/\s+/g, " ").trim();
+        }
+
+        function getChoicePromptText() {
+            if (!messageEl) return "";
+
+            // 下段メッセージ欄を複製して、選択肢そのものだけ除去する。
+            // これによりボタン文字を上部メッセージへ混ぜない。
+            const clone = messageEl.cloneNode(true);
+            clone.querySelectorAll("button, .knight-order-list").forEach(el => el.remove());
+
+            return (clone.textContent || "")
+                .replace(/\s+/g, " ")
+                .trim();
         }
 
         function hideChoiceModal() {
@@ -1444,6 +1665,14 @@
 
             movingChoicesToModal = true;
             choiceModalContent.innerHTML = "";
+
+            const promptText = getChoicePromptText();
+            if (promptText) {
+                const prompt = document.createElement("div");
+                prompt.id = "choice-modal-message";
+                prompt.textContent = promptText;
+                choiceModalContent.appendChild(prompt);
+            }
 
             if (knightOrderList) {
                 choiceModalContent.appendChild(knightOrderList);
@@ -3869,6 +4098,9 @@
         let distributionSkipsAction = false;
         let distributionOriginalBoard = null;
         let distributionTransactionSnapshot = null;
+        // コマ分配完了後にアクションが空打ちになった場合、
+        // 分配開始前へ戻すための一時スナップショット。
+        let lastActionRetrySnapshot = null;
         let pendingCombinedActions = [];
         let pendingCombinedTokens = 0;
         let flexibleCombinedMode = false;
@@ -3901,8 +4133,10 @@
                 choiceModal.classList.add("avoid-board");
             }
 
-            // 前面表示：マップ／ボード選択時だけ対象ウインドウをホイールより前へ。
-            // それ以外はアクションホイールを常に最前面にする。
+            // 前面階層を明示的に切替。
+            // 通常時：ACTION WHEELが盤面より前。
+            // MAP選択時：MAPがACTION WHEELより前。
+            // BOARD選択時：BOARDがACTION WHEELより前。
             mapSectionEl.classList.remove("window-front");
             boardContainerEl.classList.remove("window-front");
             wheelContainer.classList.remove("window-front");
@@ -3915,10 +4149,13 @@
                 mapSectionEl.classList.add("window-front");
                 boardContainerEl.classList.add("window-front");
             } else {
-        
-
-        wheelContainer.classList.add("window-front");
+                wheelContainer.classList.add("window-front");
             }
+
+            // HUD / STATUSとの重なり回避も再確認。
+            requestAnimationFrame(() => {
+                if (typeof keepWheelInSafeArea === "function") keepWheelInSafeArea();
+            });
         }
 
         function keepWheelOnScreen() {
@@ -3933,68 +4170,97 @@
         }
 
 
-        function keepWheelOutOfHudWindows() {
-            if (!wheelContainer) return;
+        function getWheelSafeBounds() {
+            const margin = 8;
 
-            const blockers = [
+            // 上部の固定情報ウインドウは左右位置に関係なく「進入禁止の高さ帯」にする。
+            const topBlockers = [
                 document.getElementById("map-toolbar-window"),
                 document.getElementById("map-score-window"),
                 document.getElementById("status-window")
-            ].filter(Boolean);
+            ].filter(el => el && el.offsetParent !== null);
 
-            const margin = 6;
+            let safeTop = margin;
+            for (const el of topBlockers) {
+                const r = el.getBoundingClientRect();
+                safeTop = Math.max(safeTop, r.bottom + margin);
+            }
+
+            // 下部メッセージ欄より下にも入れない。
+            const message = document.getElementById("message");
+            let safeBottom = window.innerHeight - margin;
+            if (message && message.offsetParent !== null) {
+                const r = message.getBoundingClientRect();
+                safeBottom = Math.min(safeBottom, r.top - margin);
+            }
+
+            return { margin, safeTop, safeBottom };
+        }
+
+        function keepWheelOutOfHudWindows() {
+            if (!wheelContainer) return;
+
+            const { margin, safeTop, safeBottom } = getWheelSafeBounds();
+            const w = wheelContainer.offsetWidth;
+            const h = wheelContainer.offsetHeight;
+
             let rect = wheelContainer.getBoundingClientRect();
             let left = rect.left;
             let top = rect.top;
 
-            const overlaps = (a, b) =>
+            const maxLeft = Math.max(margin, window.innerWidth - w - margin);
+
+            // ヘッダー下端～メッセージ上端をホイール専用の縦可動域とする。
+            let maxTop = safeBottom - h;
+            if (maxTop < safeTop) {
+                // 画面が狭すぎる場合でも上部HUDの下を最優先。
+                maxTop = safeTop;
+            }
+
+            left = Math.max(margin, Math.min(left, maxLeft));
+            top = Math.max(safeTop, Math.min(top, maxTop));
+
+            // プレイヤーボード／マップが選択中の場合だけ追加衝突回避。
+            const dynamicBlockers = [];
+            if (boardContainerEl?.classList.contains("window-front")) dynamicBlockers.push(boardContainerEl);
+            if (mapSectionEl?.classList.contains("window-front")) dynamicBlockers.push(mapSectionEl);
+
+            const overlaps = (a,b) =>
                 a.left < b.right + margin &&
                 a.right > b.left - margin &&
                 a.top < b.bottom + margin &&
                 a.bottom > b.top - margin;
 
-            // 数回繰り返して、複数ウインドウとの重なりも解消。
-            for (let pass = 0; pass < 4; pass++) {
-                rect = {
-                    left,
-                    top,
-                    right: left + wheelContainer.offsetWidth,
-                    bottom: top + wheelContainer.offsetHeight
-                };
+            for (const blocker of dynamicBlockers) {
+                const b = blocker.getBoundingClientRect();
+                const current = {left, top, right:left+w, bottom:top+h};
+                if (!overlaps(current,b)) continue;
 
-                let changed = false;
-                for (const blocker of blockers) {
-                    const b = blocker.getBoundingClientRect();
-                    if (!overlaps(rect, b)) continue;
+                // 選択対象を覆わないよう左右へ逃がす。
+                const leftCandidate = b.left - w - margin;
+                const rightCandidate = b.right + margin;
 
-                    // まず下へ逃がす。入らなければ左へ逃がす。
-                    const below = b.bottom + margin;
-                    if (below + rect.bottom - rect.top <= window.innerHeight - margin) {
-                        top = below;
-                    } else {
-                        left = Math.max(margin, b.left - (rect.right - rect.left) - margin);
-                    }
-                    changed = true;
-                    break;
+                if (leftCandidate >= margin) {
+                    left = leftCandidate;
+                } else if (rightCandidate + w <= window.innerWidth - margin) {
+                    left = rightCandidate;
                 }
-                if (!changed) break;
             }
 
-            const maxLeft = Math.max(margin, window.innerWidth - wheelContainer.offsetWidth - margin);
-            const maxTop = Math.max(margin, window.innerHeight - wheelContainer.offsetHeight - margin);
-            left = Math.min(Math.max(margin, left), maxLeft);
-            top = Math.min(Math.max(margin, top), maxTop);
+            left = Math.max(margin, Math.min(left, maxLeft));
+            top = Math.max(safeTop, Math.min(top, maxTop));
 
             wheelContainer.style.left = `${left}px`;
             wheelContainer.style.top = `${top}px`;
             wheelContainer.style.right = "auto";
             wheelContainer.style.bottom = "auto";
+            wheelContainer.style.transform = "none";
         }
 
         function keepWheelInSafeArea() {
-            keepWheelOnScreen();
             keepWheelOutOfHudWindows();
         }
+
 
         (function enableWheelResizing() {
             const wheelSvgEl = document.getElementById("wheel-svg");
@@ -4108,29 +4374,41 @@
                 wheelContainer.style.width = rect.width + "px";
                 wheelContainer.style.transform = "none";
                 wheelDragHandle.setPointerCapture(e.pointerId);
+                keepWheelInSafeArea();
                 e.preventDefault();
             });
 
             wheelDragHandle.addEventListener("pointermove", (e) => {
                 if (!dragging) return;
-                const maxLeft = Math.max(0, window.innerWidth - wheelContainer.offsetWidth);
-                const maxTop = Math.max(0, window.innerHeight - wheelContainer.offsetHeight);
-                const left = Math.max(0, Math.min(e.clientX - offsetX, maxLeft));
-                const top = Math.max(0, Math.min(e.clientY - offsetY, maxTop));
+
+                const { margin, safeTop, safeBottom } = getWheelSafeBounds();
+                const maxLeft = Math.max(margin, window.innerWidth - wheelContainer.offsetWidth - margin);
+                const maxTop = Math.max(safeTop, safeBottom - wheelContainer.offsetHeight);
+
+                const left = Math.max(margin, Math.min(e.clientX - offsetX, maxLeft));
+                const top = Math.max(safeTop, Math.min(e.clientY - offsetY, maxTop));
+
+                // 上部HUDの下端より上には、この時点で座標自体を設定しない。
                 wheelContainer.style.left = left + "px";
                 wheelContainer.style.top = top + "px";
+                wheelContainer.style.right = "auto";
+                wheelContainer.style.bottom = "auto";
+
+                keepWheelInSafeArea();
+                e.preventDefault();
             });
 
             const stopDrag = (e) => {
                 dragging = false;
+                keepWheelInSafeArea();
                 if (e && wheelDragHandle.hasPointerCapture(e.pointerId)) {
                     wheelDragHandle.releasePointerCapture(e.pointerId);
                 }
             };
             wheelDragHandle.addEventListener("pointerup", stopDrag);
             wheelDragHandle.addEventListener("pointercancel", stopDrag);
-            window.addEventListener("resize", keepWheelOnScreen);
-            window.addEventListener("orientationchange", () => setTimeout(keepWheelOnScreen, 50));
+            window.addEventListener("resize", keepWheelInSafeArea);
+            window.addEventListener("orientationchange", () => setTimeout(keepWheelInSafeArea, 50));
         })();
 
         wheelContainer.classList.add("window-front");
@@ -4322,6 +4600,46 @@
             if (cancel) cancel.addEventListener("click", cancelCurrentDistribution);
         }
 
+
+        function finishWedgeEnhancementWithoutDistribution() {
+            // 強化そのものは確定し、コマ配置だけを行わずに強化ターンを終了する。
+            enhancementInfoPending = false;
+            enhancementAwaitingSource = false;
+            isEnhancingWedge = false;
+            enhancingWedgeIndex = null;
+
+            isDistributingTokens = false;
+            distributingSourceIndex = null;
+            distributingActionTokens = 0;
+            tokensToDistribute = 0;
+            distributionNextIndex = null;
+            distributionDirection = 1;
+            distributionSpecialUsed = false;
+            distributionSourceStartChoicePending = false;
+            templarRepeatIndex = null;
+            distributionSkipsAction = false;
+
+            // 強化前へ戻すためのスナップショットは破棄＝強化を確定。
+            distributionOriginalBoard = null;
+            distributionTransactionSnapshot = null;
+
+            clearDistributionHighlights();
+            wedgeElements.forEach(w => w.classList.remove("active"));
+            updateWheelUI();
+            hideChoiceModal();
+            setInteractionMode("all");
+
+            messageEl.style.color = "#4ade80";
+            messageEl.textContent =
+                "ウェッジを強化しました。コマは分配せず、このターンのアクションは行いません。";
+
+            if (botIsExecutingTurn) {
+                setTimeout(() => botCompleteTurn("ウェッジ強化完了（コマ分配なし）"), 0);
+            } else if (gameMode === "versus") {
+                setTimeout(() => completeCurrentTurn("ウェッジ強化完了（コマ分配なし）"), 0);
+            }
+        }
+
         function beginWedgeEnhancement(index) {
             buildUsedThisTurn = false;
             crusadeUsedThisTurn = false;
@@ -4348,7 +4666,8 @@
                 `<strong>${actions[index]} に強化しました。</strong><br>` +
                 `今後このウェッジでは「${upgradedSpec}」の2種類のアクションへコマを振り分けられます。<br>` +
                 `各アクションは1個以上コマを割り当てた場合のみ実行できます。<br>` +
-                `<button id="confirm-enhancement-info" style="margin-top:8px;padding:5px 12px;cursor:pointer;">OK</button>` +
+                `<button id="confirm-enhancement-info" style="margin-top:8px;padding:5px 12px;cursor:pointer;">コマを分配する</button>` +
+                `<button id="skip-enhancement-distribution" style="margin-left:6px;padding:5px 12px;cursor:pointer;">コマを分配しない</button>` +
                 `<button id="cancel-current-enhancement" style="margin-left:6px;padding:5px 12px;cursor:pointer;">キャンセル</button>`;
 
             document.getElementById("confirm-enhancement-info")?.addEventListener("click", () => {
@@ -4358,9 +4677,15 @@
                 messageEl.innerHTML =
                     `${actions[index]} に強化しました。このターンはアクションを行いません。` +
                     `コマを分配する元のホイールマスを選択してください。` +
-                    `<button id="cancel-current-enhancement" style="margin-left:8px;padding:4px 10px;cursor:pointer;">キャンセル</button>`;
+                    `<button id="skip-enhancement-distribution" style="margin-left:8px;padding:4px 10px;cursor:pointer;">コマを分配しない</button>` +
+                    `<button id="cancel-current-enhancement" style="margin-left:6px;padding:4px 10px;cursor:pointer;">キャンセル</button>`;
+                document.getElementById("skip-enhancement-distribution")?.addEventListener("click", finishWedgeEnhancementWithoutDistribution);
                 document.getElementById("cancel-current-enhancement")?.addEventListener("click", cancelCurrentDistribution);
             });
+            document.getElementById("skip-enhancement-distribution")?.addEventListener("click", () => {
+                finishWedgeEnhancementWithoutDistribution();
+            });
+
             document.getElementById("cancel-current-enhancement")?.addEventListener("click", () => {
                 enhancementInfoPending = false;
                 cancelCurrentDistribution();
@@ -4418,6 +4743,13 @@
             const sourceIndex = distributingSourceIndex;
             const actionTokens = distributingActionTokens;
             const skipAction = distributionSkipsAction;
+
+            // 通常アクションの場合だけ、分配開始前の状態をアクション解決まで保持。
+            // 「実行できるアクションがない」時に分配からやり直せるようにする。
+            lastActionRetrySnapshot = (!skipAction && distributionTransactionSnapshot)
+                ? structuredClone(distributionTransactionSnapshot)
+                : null;
+
             isDistributingTokens = false;
             distributingSourceIndex = null;
             distributingActionTokens = 0;
@@ -4646,7 +4978,7 @@
             const effective = allocated + bonus;
             const requiredText = required == null ? "実行可能な対象なし" : `必要コスト ${required}`;
 
-            // BOTは人間用の「やり直す／戻る」ボタンを待たない。
+            // BOTは人間用の「ターンの初めからやり直す」ボタンを待たない。
             if (botIsExecutingTurn) {
                 botLog(`${actionName}：割当${allocated}＋ボーナス${bonus}では不足（${requiredText}）。この候補をスキップ`);
                 botActiveSubActionDetail = null;
@@ -4655,10 +4987,13 @@
             }
 
             messageEl.innerHTML = `${actionName}にコマ${allocated}個＋ボーナス${bonus}＝${effective}を割り当てましたが、コストが足りません（${requiredText}）。` +
-                `<button id="retry-flex-allocation" style="padding:4px 10px;cursor:pointer;">割り当てをやり直す</button>` +
-                `<button id="back-flex-action" style="padding:4px 10px;cursor:pointer;">アクション選択へ戻る</button>`;
-            document.getElementById("retry-flex-allocation").addEventListener("click", () => showFlexibleAllocationChooser(actionName));
-            document.getElementById("back-flex-action").addEventListener("click", () => showFlexibleCombinedChooser());
+                `<button id="restart-turn-from-insufficient" style="padding:5px 12px;cursor:pointer;">ターンの初めからやり直す</button>`;
+
+            document.getElementById("restart-turn-from-insufficient")?.addEventListener("click", () => {
+                // 既存の「人間手番をやり直す」と同じ完全なターン開始時スナップショットを使用する。
+                // 複合アクション途中の建設・撃破・VP・コマ配置などもまとめて巻き戻す。
+                restoreHumanTurnStart();
+            });
         }
 
         function showFlexibleAllocationChooser(actionName) {
@@ -4759,6 +5094,10 @@
         }
 
         function continueCombinedAction(finalMessage, color = "#4ade80") {
+            if (!document.getElementById("empty-action-retry")) {
+                lastActionRetrySnapshot = null;
+            }
+
             if (flexibleCombinedMode && currentFlexibleAction) {
                 const remainingAvailable = getCurrentFlexibleRemaining();
                 settleFlexibleSpentPoints(remainingAvailable);
@@ -4893,6 +5232,109 @@
             showWedgeChoice(index);
         }
 
+
+        function restoreActionForRetry() {
+            if (!lastActionRetrySnapshot) return false;
+
+            board = [...lastActionRetrySnapshot.board];
+            for (let i = 0; i < NUM_WEDGES; i++) {
+                wedgeUpgraded[i] = lastActionRetrySnapshot.wedgeUpgraded[i];
+                actions[i] = lastActionRetrySnapshot.actions[i];
+                if (actionTextElements[i]) actionTextElements[i].textContent = actions[i];
+            }
+
+            lastActionRetrySnapshot = null;
+
+            isDistributingTokens = false;
+            distributingSourceIndex = null;
+            distributingActionTokens = 0;
+            tokensToDistribute = 0;
+            distributionNextIndex = null;
+            distributionDirection = 1;
+            distributionSpecialUsed = false;
+            distributionSourceStartChoicePending = false;
+            templarRepeatIndex = null;
+            distributionSkipsAction = false;
+            distributionOriginalBoard = null;
+            distributionTransactionSnapshot = null;
+
+            pendingCombinedActions = [];
+            pendingCombinedTokens = 0;
+            flexibleCombinedMode = false;
+            flexibleCombinedActions = [];
+            flexibleBasePoints = 0;
+            flexibleBonusRemaining = {};
+            currentFlexibleAction = null;
+            currentFlexibleStartAvailable = 0;
+
+            isSelectingMove = false;
+            isSelectingBuild = false;
+            isSelectingRecruit = false;
+            isSelectingCrusade = false;
+            selectedMoveKnight = null;
+            selectedBuildKnight = null;
+            availableBuildPoints = 0;
+            availableRecruitPoints = 0;
+            availableCrusadePoints = 0;
+            remainingMovePoints = 0;
+
+            buildUsedThisTurn = false;
+            crusadeUsedThisTurn = false;
+
+            clearSelectableHexes();
+            clearBuildableHighlights();
+            clearRecruitableHighlights();
+            clearKnightActionHighlights();
+            clearDistributionHighlights();
+            wedgeElements.forEach(w => w.classList.remove("active"));
+
+            updateWheelUI();
+            setInteractionMode("all");
+            return true;
+        }
+
+        function confirmEmptyAction(actionName, reason, continueMessage) {
+            // BOTは合法手生成側で避けるのが原則。万一ここへ来た場合は停止させず続行。
+            if (botIsExecutingTurn) {
+                continueCombinedAction(
+                    `${actionName}：${reason} 実行できるアクションがないため続行します。`,
+                    "#f87171"
+                );
+                return;
+            }
+
+            setInteractionMode("none");
+            messageEl.style.color = "#f87171";
+            messageEl.innerHTML =
+                `<strong>${actionName}：実行できるアクションがありません。</strong>` +
+                `<span style="display:block;margin-top:4px;">${reason}</span>` +
+                `<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:6px;">` +
+                `<button id="empty-action-retry" style="padding:6px 10px;cursor:pointer;">アクションをやり直す</button>` +
+                `<button id="empty-action-continue" style="padding:6px 10px;cursor:pointer;">このまま続行</button>` +
+                `</div>`;
+
+            document.getElementById("empty-action-retry")?.addEventListener("click", () => {
+                if (restoreActionForRetry()) {
+                    messageEl.style.color = "#fde047";
+                    messageEl.textContent =
+                        "コマ分配前の状態に戻しました。アクションホイールからアクションを選び直してください。";
+                } else {
+                    setInteractionMode("all");
+                    messageEl.style.color = "#f87171";
+                    messageEl.textContent = "やり直し用の状態を復元できませんでした。";
+                }
+            });
+
+            document.getElementById("empty-action-continue")?.addEventListener("click", () => {
+                lastActionRetrySnapshot = null;
+                setInteractionMode("all");
+                continueCombinedAction(
+                    continueMessage || `${actionName}を実行せず、そのまま続行します。`,
+                    "#facc15"
+                );
+            });
+        }
+
         function resolveActionByName(executedAction, tokens, bonusAlreadyIncluded = false) {
             if (executedAction === "移動") {
                 setInteractionMode("map");
@@ -4954,10 +5396,22 @@
 
                 if (knightsOnEnemies.length === 0) {
                     isSelectingCrusade = false;
-                    continueCombinedAction("騎士コマがあるマスに異教徒コマがいません。十字軍アクションを終了します。", "#f87171");
+                    clearSelectableHexes();
+                    clearKnightActionHighlights();
+                    confirmEmptyAction(
+                        "十字軍",
+                        "騎士コマがいるマスに撃破対象の異教徒がいません。",
+                        "十字軍を実行せず、そのまま続行します。"
+                    );
                 } else if (!canDefeatAny) {
                     isSelectingCrusade = false;
-                    continueCombinedAction("コストが足りません。十字軍アクションを終了します。", "#f87171");
+                    clearSelectableHexes();
+                    clearKnightActionHighlights();
+                    confirmEmptyAction(
+                        "十字軍",
+                        `戦力${availableCrusadePoints}では、現在攻撃可能な異教徒を撃破できません。`,
+                        "十字軍を実行せず、そのまま続行します。"
+                    );
                 } else {
                     isSelectingCrusade = true;
                     knightsOnEnemies.forEach(([, pos]) => {
@@ -4979,7 +5433,19 @@
                 if (recruitableCount === 0) {
                     isSelectingRecruit = false;
                     clearRecruitableHighlights();
-                    continueCombinedAction("コストが足りません。招集アクションを終了します。", "#f87171");
+
+                    const army = playerBuildings.find(b => b.name === "軍隊");
+                    const nextIndex = playerResources.buildingsBuilt["軍隊"];
+                    const nextArmy = army?.levels?.[nextIndex];
+                    const reason = nextArmy
+                        ? `招集力${availableRecruitPoints}では次の軍隊（コスト${nextArmy.c}）を有効化できません。`
+                        : "すべての軍隊タイルがすでに有効です。";
+
+                    confirmEmptyAction(
+                        "招集",
+                        reason,
+                        "招集を実行せず、そのまま続行します。"
+                    );
                 } else {
                     messageEl.style.color = "#facc15";
                     messageEl.textContent = `招集アクション（招集力: ${availableRecruitPoints}）。プレイヤーボードの軍隊をクリックしてください。`;
@@ -5586,8 +6052,11 @@
                         if (availableRecruitPoints < lv.c) {
                             isSelectingRecruit = false;
                             clearRecruitableHighlights();
-                            messageEl.style.color = "#f87171";
-                            messageEl.textContent = "コストが足りませんターンを終了します";
+                            confirmEmptyAction(
+                                "招集",
+                                `招集力${availableRecruitPoints}では軍隊コスト${lv.c}を支払えません。`,
+                                "招集を実行せず、そのまま続行します。"
+                            );
                             return;
                         }
 
@@ -6223,14 +6692,48 @@
             }
         }
 
-        autoTestBtn?.addEventListener("click", () => {
-            const password = window.prompt("AUTO TEST パスワードを入力してください。");
-            if (password === null) return;
+        function openAutoTestUnlock() {
+            if (!autoTestUnlockModal) return;
+            if (autoTestPasswordError) autoTestPasswordError.textContent = "";
+            if (autoTestPasswordInput) autoTestPasswordInput.value = "";
+            autoTestUnlockModal.classList.add("active");
+            setTimeout(() => autoTestPasswordInput?.focus(), 0);
+        }
+
+        function closeAutoTestUnlock() {
+            autoTestUnlockModal?.classList.remove("active");
+            if (autoTestPasswordInput) autoTestPasswordInput.value = "";
+            if (autoTestPasswordError) autoTestPasswordError.textContent = "";
+        }
+
+        function submitAutoTestPassword() {
+            const password = autoTestPasswordInput?.value ?? "";
             if (password !== "1023") {
-                window.alert("パスワードが違います。");
+                if (autoTestPasswordError) autoTestPasswordError.textContent = "パスワードが違います。";
+                autoTestPasswordInput?.focus();
+                autoTestPasswordInput?.select();
                 return;
             }
+            closeAutoTestUnlock();
             autoTestModal?.classList.add("active");
+        }
+
+        autoTestBtn?.addEventListener("click", openAutoTestUnlock);
+        autoTestUnlockSubmit?.addEventListener("click", submitAutoTestPassword);
+        autoTestUnlockCancel?.addEventListener("click", closeAutoTestUnlock);
+
+        autoTestPasswordInput?.addEventListener("keydown", e => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                submitAutoTestPassword();
+            } else if (e.key === "Escape") {
+                e.preventDefault();
+                closeAutoTestUnlock();
+            }
+        });
+
+        autoTestUnlockModal?.addEventListener("click", e => {
+            if (e.target === autoTestUnlockModal) closeAutoTestUnlock();
         });
 
         autoTestCloseBtn?.addEventListener("click", () => {
