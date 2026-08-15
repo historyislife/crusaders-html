@@ -1478,6 +1478,288 @@
             cursor: pointer;
         }
 
+
+        /* 上部操作ボタン：マップ幅に6個を1列で収める */
+        #map-toolbar-window {
+            width: 100% !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+            display: grid !important;
+            grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+            gap: 3px !important;
+            padding: 4px !important;
+            overflow: hidden !important;
+        }
+
+        #map-toolbar-window > button {
+            min-width: 0 !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+            padding: 5px 2px !important;
+            margin: 0 !important;
+            font-size: clamp(0.52rem, 1.35vw, 0.72rem) !important;
+            line-height: 1.05 !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: clip !important;
+        }
+
+        @media (max-width: 760px) {
+            #map-toolbar-window {
+                gap: 2px !important;
+                padding: 3px !important;
+            }
+            #map-toolbar-window > button {
+                padding: 4px 1px !important;
+                font-size: clamp(0.46rem, 2.35vw, 0.62rem) !important;
+            }
+        }
+
+
+        /* BOT状態確認ボタン */
+        #status-window {
+            position: relative;
+        }
+
+        #bot-inspect-btn {
+            position: absolute;
+            top: 4px;
+            right: 5px;
+            z-index: 2;
+            min-width: 38px;
+            padding: 3px 7px;
+            border: 1px solid #64748b;
+            border-radius: 5px;
+            background: #1e293b;
+            color: #fde047;
+            font-size: .62rem;
+            font-weight: 900;
+            line-height: 1.1;
+            cursor: pointer;
+        }
+
+        #bot-inspect-btn:disabled {
+            opacity: .35;
+            cursor: default;
+        }
+
+        /* 右上ボタンぶん騎士団表示の右余白を確保 */
+        #status-window #status-panel > .status-item:first-child {
+            padding-right: 44px;
+        }
+
+        .bot-inspect-window {
+            width: min(760px, 94vw) !important;
+            max-height: 90vh;
+        }
+
+        #bot-inspect-content {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .bot-inspect-section {
+            padding: 8px;
+            border: 1px solid #475569;
+            border-radius: 7px;
+            background: rgba(15,23,42,.7);
+        }
+
+        .bot-inspect-section h3 {
+            margin: 0 0 7px;
+            color: #fde047;
+            font-size: .84rem;
+        }
+
+        .bot-inspect-status {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 12px;
+            font-size: .76rem;
+            line-height: 1.4;
+        }
+
+        .bot-inspect-board-row {
+            display: grid;
+            grid-template-columns: 48px repeat(5, minmax(42px, 1fr));
+            align-items: center;
+            gap: 4px;
+            margin: 4px 0;
+            font-size: .7rem;
+        }
+
+        .bot-inspect-board-label {
+            font-weight: 800;
+            color: #cbd5e1;
+        }
+
+        .bot-inspect-tile {
+            min-height: 34px;
+            padding: 3px 4px;
+            box-sizing: border-box;
+            border: 1px solid #64748b;
+            border-radius: 4px;
+            text-align: center;
+            background: #334155;
+            color: #f8fafc;
+        }
+
+        .bot-inspect-tile.active {
+            opacity: .42;
+        }
+
+        .bot-inspect-tile.empty {
+            visibility: hidden;
+        }
+
+        .bot-inspect-wheel {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0,1fr));
+            gap: 5px;
+        }
+
+        .bot-inspect-wedge {
+            padding: 6px;
+            border: 1px solid #64748b;
+            border-radius: 6px;
+            background: #1e293b;
+            font-size: .7rem;
+            line-height: 1.35;
+        }
+
+        .bot-inspect-wedge strong {
+            color: #fde047;
+        }
+
+        @media (max-width: 760px) {
+            #bot-inspect-btn {
+                top: 3px;
+                right: 3px;
+                min-width: 34px;
+                padding: 2px 5px;
+                font-size: .55rem;
+            }
+
+            #status-window #status-panel > .status-item:first-child {
+                padding-right: 38px;
+            }
+
+            .bot-inspect-board-row {
+                grid-template-columns: 38px repeat(5, minmax(34px, 1fr));
+                gap: 2px;
+                font-size: .58rem;
+            }
+
+            .bot-inspect-tile {
+                min-height: 30px;
+                padding: 2px;
+            }
+
+            .bot-inspect-wheel {
+                grid-template-columns: 1fr;
+            }
+        }
+
+
+        /* BOT確認画面：実ゲームのホイールを主役にし、他情報をコンパクト化 */
+        .bot-inspect-window {
+            width: min(640px, 94vw) !important;
+            max-height: 90vh !important;
+        }
+
+        #bot-inspect-content {
+            gap: 7px !important;
+            padding: 8px 10px !important;
+        }
+
+        .bot-inspect-section {
+            padding: 6px 7px !important;
+        }
+
+        .bot-inspect-section h3 {
+            margin: 0 0 4px !important;
+            font-size: .72rem !important;
+        }
+
+        .bot-inspect-status {
+            gap: 3px 9px !important;
+            font-size: .66rem !important;
+            line-height: 1.25 !important;
+        }
+
+        .bot-inspect-board-row {
+            grid-template-columns: 42px repeat(5, minmax(36px, 1fr)) !important;
+            gap: 3px !important;
+            margin: 2px 0 !important;
+            font-size: .61rem !important;
+        }
+
+        .bot-inspect-tile {
+            min-height: 27px !important;
+            padding: 2px 3px !important;
+            line-height: 1.15 !important;
+        }
+
+        .bot-inspect-wheel-visual-wrap {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            padding: 0;
+        }
+
+        .bot-inspect-wheel-svg {
+            width: min(330px, 76vw);
+            height: auto;
+            aspect-ratio: 1 / 1;
+            overflow: visible;
+        }
+
+        /* 本体と同じSVGクラスを使うが、確認画面ではクリック不可 */
+        .bot-inspect-wheel-svg .wedge {
+            cursor: default;
+        }
+
+        .bot-inspect-wheel-svg .wedge:hover {
+            fill: #334155;
+        }
+
+        .bot-inspect-wheel-svg .mancala-cube {
+            pointer-events: none;
+        }
+
+        @media (max-width: 760px) {
+            .bot-inspect-window {
+                width: 96vw !important;
+            }
+
+            #bot-inspect-content {
+                padding: 6px !important;
+                gap: 5px !important;
+            }
+
+            .bot-inspect-status {
+                font-size: .58rem !important;
+                gap: 2px 6px !important;
+            }
+
+            .bot-inspect-board-row {
+                grid-template-columns: 34px repeat(5, minmax(29px, 1fr)) !important;
+                gap: 2px !important;
+                font-size: .52rem !important;
+            }
+
+            .bot-inspect-tile {
+                min-height: 24px !important;
+                padding: 1px !important;
+            }
+
+            .bot-inspect-wheel-svg {
+                width: min(300px, 82vw);
+            }
+        }
+
     </style>
 </head>
 <body>
@@ -1487,10 +1769,11 @@
         <div id="map-hud-area">
             <div id="map-toolbar-window" class="map-hud-window">
                 <button id="new-game-btn">NEW GAME</button>
-                <button id="game-log-btn">GAME LOG</button>
+                <button id="game-log-btn">LOG</button>
                 <button id="manual-btn">MANUAL</button>
-                <button id="turn-reset-btn" disabled>TURN RESET</button>
-                <button id="auto-test-btn">AUTO TEST</button>
+                <button id="about-btn">ABOUT</button>
+                <button id="turn-reset-btn" disabled>RESET</button>
+                <button id="auto-test-btn">TEST</button>
             </div>
             <div id="map-score-window" class="map-hud-window">
                 <span class="map-status-vp">残り勝利点 <span id="map-vp">140</span></span>
@@ -1562,10 +1845,44 @@
         </div>
     </div>
 
+    <div id="about-modal" class="info-modal" role="dialog" aria-modal="true">
+        <div class="info-window">
+            <div class="info-window-header"><span>ABOUT / CREDITS</span><button id="about-close" class="info-window-close">閉じる</button></div>
+            <div class="info-window-body">
+                <h3>About This Project</h3>
+                <p>本作は『Crusaders: Thy Will Be Done』を参考に個人が制作した、非公式のファンメイド・ブラウザゲームです。</p>
+                <p>本作は原作ゲームのデザイナー、出版社、販売元その他の権利者による公式作品ではなく、それらの権利者による承認、提携、後援を受けたものではありません。</p>
+
+                <h3>Rights / Disclaimer</h3>
+                <p>『Crusaders: Thy Will Be Done』および原作に関連する名称、ゲームデザイン、その他の第三者の知的財産に関する権利は、それぞれの権利者に帰属します。</p>
+                <p>本作の独自に制作したプログラムや素材については、第三者が有する権利を侵害しない範囲で制作者に権利が帰属します。</p>
+                <p>権利者から問題の指摘や申し出があった場合には、内容を確認のうえ、必要に応じて公開内容の変更・削除等を行います。</p>
+
+                <h3>Source / License</h3>
+                <p>ソースコードの利用条件および詳細な権利表記については、GitHubリポジトリの README.md および LICENSE を参照してください。</p>
+
+                <hr>
+                <p><strong>Unofficial fan-made project.</strong><br>
+                This project is not affiliated with, endorsed by, sponsored by, or approved by the designer, publisher, distributor, or other rights holders of <em>Crusaders: Thy Will Be Done</em>.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="bot-inspect-modal" class="info-modal" role="dialog" aria-modal="true">
+        <div class="info-window bot-inspect-window">
+            <div class="info-window-header">
+                <span>BOT STATUS</span>
+                <button id="bot-inspect-close" class="info-window-close">閉じる</button>
+            </div>
+            <div id="bot-inspect-content" class="info-window-body"></div>
+        </div>
+    </div>
+
     <!-- 画面右側：UI -->
     <div id="ui-section">
         <!-- 右上：独立ステータス -->
         <div id="status-window" class="persistent-front-window">
+            <button id="bot-inspect-btn" type="button" title="BOTの状態を確認">BOT</button>
             <div id="status-window-content"></div>
         </div>
 
@@ -1595,7 +1912,14 @@
         const gameLogModal = document.getElementById("game-log-modal");
         const gameLogClose = document.getElementById("game-log-close");
         const gameLogLines = document.getElementById("game-log-lines");
+        const botInspectBtn = document.getElementById("bot-inspect-btn");
+        const botInspectModal = document.getElementById("bot-inspect-modal");
+        const botInspectClose = document.getElementById("bot-inspect-close");
+        const botInspectContent = document.getElementById("bot-inspect-content");
         const manualBtn = document.getElementById("manual-btn");
+        const aboutBtn = document.getElementById("about-btn");
+        const aboutModal = document.getElementById("about-modal");
+        const aboutClose = document.getElementById("about-close");
         const turnResetBtn = document.getElementById("turn-reset-btn");
         const autoTestBtn = document.getElementById("auto-test-btn");
         const autoTestUnlockModal = document.getElementById("auto-test-unlock-modal");
@@ -1755,7 +2079,171 @@
         manualBtn?.addEventListener("click",()=>{manualContent.innerHTML=buildManualHtml();openInfoModal(manualModal);});
         manualClose?.addEventListener("click",()=>closeInfoModal(manualModal));
         manualModal?.addEventListener("click",e=>{if(e.target===manualModal)closeInfoModal(manualModal);});
+
+        function getBotInspectionState() {
+            if (gameMode !== "versus" || !Array.isArray(playerStates)) return null;
+            const botIndex = playerStates.findIndex(st => st?.controller === "bot-normal");
+            if (botIndex < 0) return null;
+
+            // BOTの手番中はグローバル状態が最新なので、表示専用オブジェクトへコピー。
+            if (currentPlayerIndex === botIndex && playerController === "bot-normal") {
+                return {
+                    name: playerStates[botIndex]?.name || "BOT",
+                    controller: "bot-normal",
+                    selectedKnightOrder,
+                    resources: structuredClone(playerResources),
+                    board: [...board],
+                    wedgeUpgraded: [...wedgeUpgraded],
+                    actions: [...actions],
+                    knightPositions: structuredClone(knightPositions)
+                };
+            }
+            return structuredClone(playerStates[botIndex]);
+        }
+
+
+        function buildBotWheelVisual(st) {
+            const botBoard = st.board || Array(NUM_WEDGES).fill(0);
+            const botActions = st.actions || baseActions;
+            const upgraded = st.wedgeUpgraded || Array(NUM_WEDGES).fill(false);
+
+            const svg = document.createElementNS(SVG_NS, "svg");
+            svg.setAttribute("viewBox", "-110 -110 220 220");
+            svg.classList.add("bot-inspect-wheel-svg");
+            svg.setAttribute("aria-label", "BOTのアクションホイール");
+
+            const localCubeLayer = document.createElementNS(SVG_NS, "g");
+            localCubeLayer.classList.add("mancala-cube-layer");
+
+            for (let i = 0; i < NUM_WEDGES; i++) {
+                const startAngle = i * 60 - 30;
+                const endAngle = (i + 1) * 60 - 30;
+                const p1 = getWheelCoords(startAngle, wheelRadius);
+                const p2 = getWheelCoords(endAngle, wheelRadius);
+
+                const path = document.createElementNS(SVG_NS, "path");
+                path.setAttribute("d", `M 0 0 L ${p1.x} ${p1.y} L ${p2.x} ${p2.y} Z`);
+                path.classList.add("wedge");
+                if (upgraded[i]) path.classList.add("upgraded");
+                svg.appendChild(path);
+
+                const midAngle = startAngle + 30;
+                const txtPos = getWheelCoords(midAngle, wheelRadius * 0.68);
+                const numPos = getWheelCoords(midAngle, wheelRadius * 0.40);
+
+                const actionText = document.createElementNS(SVG_NS, "text");
+                actionText.setAttribute("x", txtPos.x);
+                actionText.setAttribute("y", txtPos.y + 4);
+                actionText.classList.add("wedge-text");
+                actionText.textContent = botActions[i] || "";
+                svg.appendChild(actionText);
+
+                const numText = document.createElementNS(SVG_NS, "text");
+                numText.setAttribute("x", numPos.x);
+                numText.setAttribute("y", numPos.y);
+                numText.classList.add("token-count");
+                numText.textContent = botBoard[i] ?? 0;
+                svg.appendChild(numText);
+
+                const base = getWheelCoords(i * 60, wheelRadius * 0.54);
+                const tangent = (i * 60) * Math.PI / 180;
+                const nx = Math.cos(tangent);
+                const ny = Math.sin(tangent);
+                const visibleCount = Math.max(0, Number(botBoard[i]) || 0);
+
+                for (let j = 0; j < visibleCount; j++) {
+                    const offset = (j - (visibleCount - 1) / 2) * 11;
+                    localCubeLayer.appendChild(
+                        createMancalaCube(base.x + nx * offset, base.y + ny * offset, 5.5, false)
+                    );
+                }
+            }
+
+            svg.appendChild(localCubeLayer);
+
+            const wrap = document.createElement("div");
+            wrap.className = "bot-inspect-wheel-visual-wrap";
+            wrap.appendChild(svg);
+            return wrap;
+        }
+
+        function renderBotInspection() {
+            if (!botInspectContent) return;
+            const st = getBotInspectionState();
+            if (!st) {
+                botInspectContent.innerHTML =
+                    '<div class="bot-inspect-section">BOT対戦中のみ確認できます。</div>';
+                return;
+            }
+
+            const r = st.resources || {};
+            const bonuses = r.bonuses || {};
+            const defeated = r.defeated || {};
+            const built = r.buildingsBuilt || {};
+            const botActions = st.actions || baseActions;
+            const botBoard = st.board || Array(NUM_WEDGES).fill(0);
+            const upgraded = st.wedgeUpgraded || Array(NUM_WEDGES).fill(false);
+
+            const statusHtml = `
+                <div class="bot-inspect-section">
+                    <h3>現在ステータス</h3>
+                    <div class="bot-inspect-status">
+                        <span>騎士団 <strong>${st.selectedKnightOrder || "未選択"}</strong></span>
+                        <span>勝利点 <strong>${r.victoryPoints ?? 0}</strong></span>
+                        <span>🏹${defeated["サラセン人"] ?? 0}</span>
+                        <span>🛡${defeated["プロイセン人"] ?? 0}</span>
+                        <span>⚔${defeated["スラブ人"] ?? 0}</span>
+                        <span>移動 <strong>${bonuses.move ?? 0}</strong></span>
+                        <span>建設 <strong>${bonuses.build ?? 0}</strong></span>
+                        <span>招集 <strong>${bonuses.recruit ?? 0}</strong></span>
+                        <span>影響 <strong>${bonuses.influence ?? 0}</strong></span>
+                        <span>軍事 <strong>${bonuses.military ?? 0}</strong></span>
+                    </div>
+                </div>`;
+
+            const boardRows = playerBuildings.map(building => {
+                const activeCount = built[building.name] || 0;
+                const cells = Array.from({length:5}, (_, i) => {
+                    const lv = building.levels[i];
+                    if (!lv) return '<div class="bot-inspect-tile empty"></div>';
+                    const activeClass = i < activeCount ? ' active' : '';
+                    return `<div class="bot-inspect-tile${activeClass}">🔨${lv.c}<br>⭐${lv.p}</div>`;
+                }).join("");
+                return `<div class="bot-inspect-board-row"><div class="bot-inspect-board-label">${building.name}</div>${cells}</div>`;
+            }).join("");
+
+            botInspectContent.innerHTML =
+                statusHtml +
+                `<div class="bot-inspect-section"><h3>プレイヤーボード</h3>${boardRows}</div>` +
+                `<div class="bot-inspect-section" id="bot-inspect-wheel-section"><h3>アクションホイール</h3></div>`;
+
+            const wheelSection = document.getElementById("bot-inspect-wheel-section");
+            if (wheelSection) wheelSection.appendChild(buildBotWheelVisual(st));
+        }
+
+        function refreshBotInspectButton() {
+            if (!botInspectBtn) return;
+            botInspectBtn.disabled =
+                gameMode !== "versus" ||
+                !Array.isArray(playerStates) ||
+                !playerStates.some(st => st?.controller === "bot-normal");
+        }
+
+        botInspectBtn?.addEventListener("click", () => {
+            renderBotInspection();
+            openInfoModal(botInspectModal);
+        });
+        botInspectClose?.addEventListener("click", () => closeInfoModal(botInspectModal));
+        botInspectModal?.addEventListener("click", e => {
+            if (e.target === botInspectModal) closeInfoModal(botInspectModal);
+        });
+
+
+        aboutBtn?.addEventListener("click",()=>openInfoModal(aboutModal));
+        aboutClose?.addEventListener("click",()=>closeInfoModal(aboutModal));
+        aboutModal?.addEventListener("click",e=>{if(e.target===aboutModal)closeInfoModal(aboutModal);});
         newGameBtn.addEventListener("click",()=>resetGameLog());
+        setTimeout(refreshBotInspectButton, 0);
 
         const COLS = 8;
         const ROWS = 6;
@@ -5585,6 +6073,8 @@
         statusWindowContent.appendChild(statusPanel);
 
         function updateStatusUI() {
+            refreshBotInspectButton();
+
             const orderEl = document.getElementById("status-knight-order");
             if (orderEl) {
                 const prefix = gameMode === "versus" && playerStates[currentPlayerIndex] ? `${playerStates[currentPlayerIndex].name}：` : "";
