@@ -3019,6 +3019,7 @@
             },
             endGameBonuses: {
                 castleEnemySet: false,
+                churchSixPoints: false,
                 farmKnightArmy: false,
                 bankLevel4Buildings: false
             }
@@ -6030,7 +6031,7 @@
 
         const buildingEffects = {
             "城": [
-                "2個目の騎士コマを城と同じマスに置く\n移動力ボーナス+1",
+                "2個目の騎士コマを城と同じマスに置く",
                 "移動力ボーナス+1",
                 "3個目の騎士コマを城と同じマスに置く\n軍事力ボーナス+1",
                 "ゲーム終了時：異教徒コマ3種1セットごとに4勝利点"
@@ -6039,7 +6040,7 @@
                 "影響力ボーナス+1",
                 "影響力ボーナス+1",
                 "影響力ボーナス+1\n移動力ボーナス+1",
-                "勝利点+6"
+                "ゲーム終了時：勝利点+6"
             ],
             "農場": [
                 "招集力ボーナス+1",
@@ -6132,6 +6133,11 @@
                 const points = sets * 4;
                 total += points;
                 details.push(`城Lv4：異教徒3種 ${sets}セット ×4 = ${points}点`);
+            }
+
+            if (playerResources.endGameBonuses.churchSixPoints) {
+                total += 6;
+                details.push("教会Lv4：+6点");
             }
 
             if (playerResources.endGameBonuses.farmKnightArmy) {
@@ -6310,8 +6316,7 @@
             if (buildingName === "城") {
                 if (builtLevel === 1) {
                     placeExtraKnightToken(c, r, 2);
-                    playerResources.bonuses.move += 1;
-                    bonusMessage = "2個目の騎士コマを配置、移動力+1";
+                    bonusMessage = "2個目の騎士コマを配置";
                 } else if (builtLevel === 2) {
                     playerResources.bonuses.move += 1;
                     bonusMessage = "移動力+1";
@@ -6332,8 +6337,8 @@
                     playerResources.bonuses.move += 1;
                     bonusMessage = "影響力+1、移動力+1";
                 } else if (builtLevel === 4) {
-                    addVictoryPoints(6);
-                    bonusMessage = "勝利点+6";
+                    playerResources.endGameBonuses.churchSixPoints = true;
+                    bonusMessage = "ゲーム終了時、勝利点+6";
                 }
             } else if (buildingName === "農場") {
                 if (builtLevel === 1 || builtLevel === 2) {
