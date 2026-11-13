@@ -1760,6 +1760,47 @@
             }
         }
 
+
+        /* ホイール拡縮操作（タッチ対応） */
+        #wheel-drag-handle {display:flex;align-items:center;justify-content:space-between;gap:4px;padding:5px 7px;}
+        #wheel-zoom-controls {display:flex;align-items:center;gap:4px;touch-action:manipulation;}
+        #wheel-zoom-controls button {width:28px;height:27px;min-width:28px;padding:0;border:1px solid #94a3b8;border-radius:5px;background:#172033;color:white;font-size:18px;font-weight:bold;line-height:1;touch-action:manipulation;cursor:pointer;}
+        #wheel-zoom-controls button:active {background:#475569;}
+        #wheel-container {min-width:0 !important;}
+        #wheel-svg {max-width:none !important;}
+        /* スマホ縦画面はマップとボードを上下に配置し、建物欄の横幅を確保 */
+        @media (max-width:760px) and (orientation:portrait) {
+            body {display:flex;flex-direction:column;gap:5px;padding:5px;height:100dvh;max-height:100dvh;overflow:hidden;}
+            #left-section {flex:0 0 51%;width:100%;height:51%;min-height:0;gap:4px;}
+            #ui-section {flex:1 1 0;width:100%;height:auto;min-height:0;overflow:hidden;}
+            #map-hud-area {gap:3px;}
+            #map-toolbar-window {gap:2px !important;padding:3px !important;}
+            #map-toolbar-window > button {font-size:clamp(9px,2.35vw,12px) !important;padding:5px 1px !important;}
+            #map-score-window {overflow-x:auto;scrollbar-width:thin;gap:9px;font-size:11px;min-height:35px;}
+            #map-score-window > span {flex-shrink:0;}
+            #map-section {flex:1 1 0;min-height:0;}
+            #message {flex:0 0 auto !important;max-height:66px;min-height:35px;padding:5px 7px;font-size:12px;line-height:1.3;overflow-y:auto;}
+            #status-window {margin:0 0 3px;flex:0 0 auto;}
+            #status-window #status-panel {display:grid;grid-template-columns:1fr 1fr;gap:3px 7px;padding:4px 6px;font-size:11px;}
+            #status-window #status-panel > .status-item:first-child {grid-column:1/-1;display:flex;justify-content:flex-start;gap:7px;padding-right:40px;white-space:nowrap;}
+            #status-window #status-panel > .status-item:first-child .status-value {overflow:hidden;text-overflow:ellipsis;}
+            #status-window #defeat-status {grid-column:2;white-space:nowrap;justify-content:flex-end;}
+            #status-window .status-action-row {grid-column:1/-1;display:flex;gap:8px;flex-wrap:nowrap;overflow-x:auto;white-space:nowrap;font-size:10px;}
+            #board-container {flex:1 1 0;min-height:0;overflow-y:auto;overflow-x:auto;padding:7px 6px;gap:5px;}
+            .building-row {display:flex;gap:5px;align-items:center;min-width:0;}
+            .building-title {flex:0 0 39px;width:39px;font-size:12px;white-space:nowrap;}
+            .building-tiles {display:grid;grid-template-columns:repeat(5,minmax(0,1fr));flex:1;gap:3px;min-width:0;}
+            .building-tile-wrapper {min-width:0;}
+            .tile {width:100%;min-width:0 !important;padding:3px 1px;font-size:clamp(10px,2.8vw,13px);}
+            #wheel-container {position:fixed;top:24%;left:auto;right:8px;transform:none;padding:0 3px 5px;}
+            #wheel-drag-handle {font-size:10px;}
+            #wheel-resize-handle {width:26px;height:26px;}
+        }
+        @media (max-width:380px) and (orientation:portrait) {
+            #status-window #status-panel {font-size:10px;}
+            .building-title {flex-basis:35px;width:35px;font-size:11px;}
+            .building-tiles {gap:2px;}
+        }
     </style>
 </head>
 <body>
@@ -1891,7 +1932,7 @@
 
         <!-- 下部：ホイール -->
         <div id="wheel-container">
-            <div id="wheel-drag-handle">ACTION WHEEL</div>
+            <div id="wheel-drag-handle"><span>ACTION WHEEL</span><span id="wheel-zoom-controls"><button id="wheel-zoom-out" type="button" aria-label="ホイール縮小">−</button><button id="wheel-zoom-reset" type="button" aria-label="ホイール標準サイズ">↺</button><button id="wheel-zoom-in" type="button" aria-label="ホイール拡大">＋</button></span></div>
             <div id="wheel-svg-wrapper">
                 <svg id="wheel-svg" viewBox="-110 -110 220 220"></svg>
             </div>
@@ -4678,7 +4719,7 @@
             // 下部メッセージ欄より下にも入れない。
             const message = document.getElementById("message");
             let safeBottom = window.innerHeight - margin;
-            if (message && message.offsetParent !== null) {
+            if (message && message.offsetParent !== null && !matchMedia("(max-width:760px) and (orientation:portrait)").matches) {
                 const r = message.getBoundingClientRect();
                 safeBottom = Math.min(safeBottom, r.top - margin);
             }
@@ -4754,89 +4795,53 @@
         (function enableWheelResizing() {
             const wheelSvgEl = document.getElementById("wheel-svg");
             if (!wheelResizeHandle || !wheelSvgEl) return;
-
-            // 端末ごとのレスポンシブCSS適用後のサイズを「初期＝最小」とする。
-            const initialSvgRect = wheelSvgEl.getBoundingClientRect();
-            const initialWindowRect = wheelContainer.getBoundingClientRect();
-            const MIN_SVG_SIZE = Math.max(1, initialSvgRect.width || 220);
-            const MIN_WINDOW_WIDTH = Math.max(1, initialWindowRect.width || 232);
-            const MAX_SCALE = 2.5;
-
+            const zoomOut = document.getElementById("wheel-zoom-out");
+            const zoomIn = document.getElementById("wheel-zoom-in");
+            const zoomReset = document.getElementById("wheel-zoom-reset");
+            let currentSize = 0;
             let resizing = false;
-            let startX = 0;
-            let startY = 0;
-            let startSvgSize = MIN_SVG_SIZE;
-
-            const getCurrentSvgSize = () => {
-                const rect = wheelSvgEl.getBoundingClientRect();
-                return rect.width || MIN_SVG_SIZE;
-            };
-
-            const applySize = (svgSize) => {
-                const clampedSvg = Math.max(
-                    MIN_SVG_SIZE,
-                    Math.min(MIN_SVG_SIZE * MAX_SCALE, svgSize)
-                );
-                const scale = clampedSvg / MIN_SVG_SIZE;
-                const windowWidth = MIN_WINDOW_WIDTH * scale;
-
-                // 後段のスマホ用 @media CSS より確実に優先する。
-                wheelSvgEl.style.setProperty("width", `${clampedSvg}px`, "important");
-                wheelSvgEl.style.setProperty("height", `${clampedSvg}px`, "important");
+            let startX = 0, startY = 0, startSize = 0;
+            const portrait = () => matchMedia("(max-width:760px) and (orientation:portrait)").matches;
+            const baseSize = () => portrait() ? Math.min(146, Math.max(112, innerWidth * .36)) : Math.min(220, Math.max(130, innerWidth * .25));
+            const minSize = () => portrait() ? 100 : 115;
+            const maxSize = () => Math.min(innerWidth - 24, Math.max(110, getWheelSafeBounds().safeBottom - getWheelSafeBounds().safeTop - 42), 440);
+            const applySize = (size) => {
+                currentSize = Math.max(minSize(), Math.min(maxSize(), size));
+                const windowWidth = currentSize + 8;
+                wheelSvgEl.style.setProperty("width", currentSize + "px", "important");
+                wheelSvgEl.style.setProperty("height", currentSize + "px", "important");
                 wheelSvgEl.style.setProperty("max-width", "none", "important");
-
-                wheelContainer.style.setProperty("width", `${windowWidth}px`, "important");
-                wheelContainer.style.setProperty("min-width", `${windowWidth}px`, "important");
+                wheelContainer.style.setProperty("width", windowWidth + "px", "important");
+                wheelContainer.style.setProperty("min-width", "0", "important");
                 wheelContainer.style.setProperty("max-width", "none", "important");
-
-                // 縦横比はホイール自体を常に1:1で固定。
                 wheelSvgEl.style.aspectRatio = "1 / 1";
-
                 keepWheelInSafeArea();
             };
-
+            // 小さな画面では最初から小さく表示。±ボタンで段階的に変更できる。
+            applySize(baseSize());
+            const adjust = delta => applySize(currentSize + delta);
+            zoomOut?.addEventListener("click", e => {e.stopPropagation();adjust(-30);});
+            zoomIn?.addEventListener("click", e => {e.stopPropagation();adjust(30);});
+            zoomReset?.addEventListener("click", e => {e.stopPropagation();applySize(baseSize());});
+            for (const btn of [zoomOut,zoomIn,zoomReset]) {
+                btn?.addEventListener("pointerdown", e => e.stopPropagation());
+            }
             wheelResizeHandle.addEventListener("pointerdown", e => {
-                e.preventDefault();
-                e.stopPropagation();
-
-                resizing = true;
-                startX = e.clientX;
-                startY = e.clientY;
-                startSvgSize = getCurrentSvgSize();
-
-                try {
-                    wheelResizeHandle.setPointerCapture(e.pointerId);
-                } catch (_) {}
+                e.preventDefault();e.stopPropagation();resizing=true;
+                startX=e.clientX;startY=e.clientY;startSize=currentSize;
+                try {wheelResizeHandle.setPointerCapture(e.pointerId);} catch(_) {}
             });
-
             wheelResizeHandle.addEventListener("pointermove", e => {
-                if (!resizing) return;
-                e.preventDefault();
-                e.stopPropagation();
-
-                const dx = e.clientX - startX;
-                const dy = e.clientY - startY;
-
-                // 右下へドラッグ＝拡大、左上へドラッグ＝縮小。
-                // 横と縦の両方を使うのでタッチ操作でも反応しやすい。
-                const delta = (dx + dy) / 2;
-                applySize(startSvgSize + delta);
+                if(!resizing)return;
+                e.preventDefault();e.stopPropagation();
+                applySize(startSize + ((e.clientX-startX)+(e.clientY-startY))/2);
             });
-
-            const stopResize = e => {
-                if (!resizing) return;
-                resizing = false;
-                try {
-                    if (e && wheelResizeHandle.hasPointerCapture(e.pointerId)) {
-                        wheelResizeHandle.releasePointerCapture(e.pointerId);
-                    }
-                } catch (_) {}
-            };
-
-            wheelResizeHandle.addEventListener("pointerup", stopResize);
-            wheelResizeHandle.addEventListener("pointercancel", stopResize);
+            const stopResize=e=>{resizing=false;try{if(wheelResizeHandle.hasPointerCapture(e.pointerId))wheelResizeHandle.releasePointerCapture(e.pointerId);}catch(_){}};
+            wheelResizeHandle.addEventListener("pointerup",stopResize);
+            wheelResizeHandle.addEventListener("pointercancel",stopResize);
+            window.addEventListener("resize",()=>applySize(currentSize));
+            window.addEventListener("orientationchange",()=>setTimeout(()=>applySize(baseSize()),120));
         })();
-
 
 
         window.addEventListener("resize", () => {
